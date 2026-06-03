@@ -1892,12 +1892,38 @@
                         el.querySelectorAll('.add-run').forEach(b => b.style.visibility = 'hidden');
                     });
 
+                    // html2canvas doesn't reliably inherit CSS font sizes for inputs/selects —
+                    // stamp computed values as inline styles before capture, restore after
+                    const formEls = appEl.querySelectorAll('input, select, textarea');
+                    const savedStyles = Array.from(formEls).map(el => {
+                        const cs  = getComputedStyle(el);
+                        const prev = {
+                            fontSize:   el.style.fontSize,
+                            lineHeight: el.style.lineHeight,
+                            width:      el.style.width,
+                            overflow:   el.style.overflow
+                        };
+                        el.style.fontSize   = cs.fontSize;
+                        el.style.lineHeight = cs.lineHeight;
+                        el.style.width      = cs.width;
+                        el.style.overflow   = 'visible';
+                        return { el, prev };
+                    });
+
                     const canvas = await window.html2canvas(appEl, {
                         scale: SCALE, useCORS: true, allowTaint: true,
                         backgroundColor: '#ffffff', logging: false
                     });
 
-                    // Restore immediately
+                    // Restore inline styles
+                    savedStyles.forEach(({ el, prev }) => {
+                        el.style.fontSize   = prev.fontSize;
+                        el.style.lineHeight = prev.lineHeight;
+                        el.style.width      = prev.width;
+                        el.style.overflow   = prev.overflow;
+                    });
+
+                    // Restore visibility/display
                     if (footerEl)      footerEl.style.display     = '';
                     if (addSessionRow) addSessionRow.style.display = '';
                     allTlRows.forEach(row => row.style.display = '');
