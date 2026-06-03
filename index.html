@@ -1831,20 +1831,13 @@
 
             generatePDFFromSections(sessionIndices) {
                 if (sessionIndices.length === 0) return;
-                // Must open synchronously in the click handler — async open gets popup-blocked
+                // Open synchronously — async open gets popup-blocked
                 const outputWin = window.open('', '_blank');
                 if (!outputWin) { alert('Please allow popups for this page and try again.'); return; }
-                outputWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>F1 Run Plan</title>
-                    <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { background:#fff; }
-                        .page { page-break-after:always; break-after:page; }
-                        .page:last-child { page-break-after:avoid; break-after:avoid; }
-                        img { display:block; }
-                        @page { size: A4 portrait; margin: 8mm; }
-                        @media print { * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
-                    </style>
-                </head><body></body></html>`);
+                // Show a loading message while screenshots are being taken
+                outputWin.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>F1 Run Plan</title></head>' +
+                    '<body style="background:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">' +
+                    '<p style="font-size:18px;color:#666;">Generating PDF…</p></body></html>');
                 outputWin.document.close();
                 this._doScreenshots(sessionIndices, outputWin);
             }
@@ -1861,14 +1854,11 @@
                     });
                 }
 
-                // A4 portrait usable area at 96 dpi with 8mm margins each side:
-                // (210 - 16) mm * 96/25.4 ≈ 734px wide
-                // (297 - 16) mm * 96/25.4 ≈ 1062px tall
+                // A4 portrait usable area at 96 dpi with 8mm margins each side
                 const PAGE_W = 734;
                 const PAGE_H = 1062;
-                const SCALE  = 2; // capture at 2x for crisp text, divide back out for sizing
+                const SCALE  = 2;
 
-                // Map rendered timeline rows → session indices
                 const visibleWithRuns = this.state.sessions
                     .map((s, i) => s.runs.length > 0 ? i : -1)
                     .filter(i => i >= 0);
@@ -1880,13 +1870,17 @@
                 const tlContainer   = document.querySelector('.timeline-container');
                 const allTlRows     = tlContainer ? Array.from(tlContainer.querySelectorAll('.timeline-session')) : [];
 
+                // ── Collect all screenshots as data URLs first ──
+                const pages = [];
+
                 for (const sessionIdx of sessionIndices) {
-                    // ── Hide unwanted elements ──
-                    if (footerEl)      footerEl.style.display      = 'none';
-                    if (addSessionRow) addSessionRow.style.display  = 'none';
+                    if (footerEl)      footerEl.style.display     = 'none';
+                    if (addSessionRow) addSessionRow.style.display = 'none';
+
                     allTlRows.forEach((row, i) => {
                         row.style.display = visibleWithRuns[i] === sessionIdx ? '' : 'none';
                     });
+
                     const toReCollapse = [];
                     allSessionEls.forEach((el, i) => {
                         if (i !== sessionIdx) { el.style.display = 'none'; return; }
@@ -1898,18 +1892,14 @@
                         el.querySelectorAll('.add-run').forEach(b => b.style.visibility = 'hidden');
                     });
 
-                    // ── Screenshot ──
                     const canvas = await window.html2canvas(appEl, {
-                        scale: SCALE,
-                        useCORS: true,
-                        allowTaint: true,
-                        backgroundColor: '#ffffff',
-                        logging: false
+                        scale: SCALE, useCORS: true, allowTaint: true,
+                        backgroundColor: '#ffffff', logging: false
                     });
 
-                    // ── Restore DOM immediately ──
-                    if (footerEl)      footerEl.style.display      = '';
-                    if (addSessionRow) addSessionRow.style.display  = '';
+                    // Restore immediately
+                    if (footerEl)      footerEl.style.display     = '';
+                    if (addSessionRow) addSessionRow.style.display = '';
                     allTlRows.forEach(row => row.style.display = '');
                     allSessionEls.forEach(el => {
                         el.style.display = '';
@@ -1917,36 +1907,37 @@
                     });
                     toReCollapse.forEach(c => c.classList.add('collapsed'));
 
-                    // ── Scale image to fit page while preserving aspect ratio ──
+                    // Scale down to fit page — never scale up (Math.min 1)
                     const naturalW = canvas.width  / SCALE;
                     const naturalH = canvas.height / SCALE;
-                    const fit      = Math.min(PAGE_W / naturalW, PAGE_H / naturalH);
-                    const dispW    = Math.round(naturalW * fit);
-                    const dispH    = Math.round(naturalH * fit);
-
-                    const img = outputWin.document.createElement('img');
-                    img.style.width  = dispW + 'px';
-                    img.style.height = dispH + 'px';
-                    img.src = canvas.toDataURL('image/png');
-
-                    const page = outputWin.document.createElement('div');
-                    page.className = 'page';
-                    page.appendChild(img);
-                    outputWin.document.body.appendChild(page);
+                    const fit      = Math.min(1, PAGE_W / naturalW, PAGE_H / naturalH);
+                    pages.push({
+                        dataUrl: canvas.toDataURL('image/png'),
+                        w: Math.round(naturalW * fit),
+                        h: Math.round(naturalH * fit)
+                    });
                 }
 
-                // Wait for every image in the output window to finish loading,
-                // then wait one render frame before opening the print dialog
-                const imgs = Array.from(outputWin.document.querySelectorAll('img'));
-                await Promise.all(imgs.map(img =>
-                    img.complete
-                        ? Promise.resolve()
-                        : new Promise(r => { img.onload = r; img.onerror = r; })
-                ));
-                await new Promise(r => setTimeout(r, 200));
+                // ── Write complete final HTML in one shot with window.onload print trigger ──
+                const pagesHTML = pages.map((p, i) =>
+                    `<div style="page-break-after:${i < pages.length - 1 ? 'always' : 'avoid'};break-after:${i < pages.length - 1 ? 'page' : 'avoid'};">` +
+                    `<img src="${p.dataUrl}" width="${p.w}" height="${p.h}"></div>`
+                ).join('');
 
-                outputWin.focus();
-                outputWin.print();
+                outputWin.document.open();
+                outputWin.document.write(`<!DOCTYPE html><html><head>
+                    <meta charset="UTF-8"><title>F1 Run Plan</title>
+                    <style>
+                        *{margin:0;padding:0;box-sizing:border-box;}
+                        body{background:#fff;}
+                        img{display:block;}
+                        @page{size:A4 portrait;margin:8mm;}
+                        @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+                    </style>
+                </head><body>${pagesHTML}
+                <script>window.onload=function(){window.focus();window.print();};<\/script>
+                </body></html>`);
+                outputWin.document.close();
             }
 
             attachEventListeners() {
