@@ -1,0 +1,2367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Run Plan Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: #000;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        #app {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: #2B2929;
+            padding: 0 16px;
+            border-radius: 6px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            border: 1px solid #FF2D00;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            height: 48px;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .header-logo svg {
+            height: 22px;
+            width: auto;
+        }
+
+        .header-divider {
+            width: 1px;
+            height: 28px;
+            background: #444;
+            flex-shrink: 0;
+        }
+
+        .header-event-select {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+            padding: 0;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .header-event-select option {
+            background: #2B2929;
+            color: white;
+            font-weight: normal;
+        }
+
+        .header-track-info {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            color: #aaa;
+            margin-left: auto;
+            align-items: center;
+        }
+
+        .header-track-info span {
+            white-space: nowrap;
+        }
+
+        .header-btn {
+            background: transparent;
+            border: 1px solid #555;
+            color: #ccc;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .header-btn:hover {
+            border-color: #aaa;
+            color: white;
+        }
+
+        /* Timeline */
+        .timeline-container {
+            background: white;
+            padding: 5px 7px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .timeline-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .timeline {
+            position: relative;
+            min-height: 120px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+
+        .timeline-sessions {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 10px;
+        }
+
+        .timeline-session {
+            background: white;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+
+        .timeline-session-label {
+            position: relative;
+            padding: 2px 5px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+            overflow: hidden;
+            min-height: 20px;
+        }
+
+        .timeline-session-label-text {
+            position: relative;
+            z-index: 2;
+        }
+
+        .timeline-tick-label-header {
+            position: absolute;
+            top: 3px;
+            font-size: 9px;
+            color: #888;
+            white-space: nowrap;
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        .timeline-bar-row {
+            position: relative;
+            height: 62px;
+        }
+
+        .timeline-runs {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .timeline-run {
+            position: absolute;
+            top: 3px;
+            height: calc(100% - 6px);
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.25);
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .timeline-run:hover {
+            filter: brightness(0.92);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .timeline-run-header {
+            height: 28px;
+            line-height: 28px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #000;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            padding: 0 3px;
+        }
+
+        .timeline-run-laps {
+            position: relative;
+            height: calc(100% - 28px);
+            display: flex;
+        }
+
+        .timeline-lap-seg {
+            position: relative;
+            height: 100%;
+            border-right: 1px solid rgba(0,0,0,0.15);
+            flex-shrink: 0;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .timeline-lap-seg:last-child {
+            border-right: none;
+        }
+
+        .timeline-lap-label {
+            font-size: 8px;
+            font-weight: 600;
+            color: rgba(0,0,0,0.65);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+            text-transform: capitalize;
+            pointer-events: none;
+            line-height: 1;
+        }
+
+        .timeline-session-end-flag {
+            position: absolute;
+            font-size: 12px;
+            transform: translateX(-50%);
+            z-index: 10;
+            top: 2px;
+            line-height: 1;
+        }
+
+        .timeline-session-end {
+            position: absolute;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                #000 0px,
+                #000 6px,
+                #fff 6px,
+                #fff 12px
+            );
+        }
+
+        .timeline-tick {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .timeline-tick-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 100%;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                #aaa 0px,
+                #aaa 4px,
+                transparent 4px,
+                transparent 10px
+            );
+        }
+
+        .timeline-tick-label {
+            display: none;
+        }
+
+        /* Sessions */
+        .sessions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .session {
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border: 1px solid #FF2D00;
+        }
+
+        .session-header {
+            background: #2B2929;
+            padding: 3px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            color: white;
+        }
+
+        .session-header:hover {
+            background: #5a5656;
+        }
+
+        .session-title {
+            font-size: 15px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .session-time {
+            font-size: 13px;
+            color: #ccc;
+            margin-left: 10px;
+        }
+
+        .session-summary {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-left: 30px;
+            flex-grow: 1;
+            font-size: 12px;
+            color: white;
+        }
+
+        .session-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .session-summary-label {
+            color: #aaa;
+            font-weight: 500;
+        }
+
+        .session-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input {
+            cursor: pointer;
+        }
+
+        .session-content {
+            padding: 4px 6px;
+        }
+
+        .session-content.collapsed {
+            display: none;
+        }
+
+        .runs {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .no-runs {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-style: italic;
+        }
+
+        /* Run Card */
+        .run-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .run-header {
+            background: #B3AFAF;
+            color: white;
+            padding: 1px 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 12px;
+        }
+
+        .run-title {
+            font-weight: 700;
+            font-size: 13px;
+            min-width: 45px;
+            color: #222;
+        }
+
+        .run-header label,
+        .run-header .form-group label {
+            color: #222 !important;
+            font-weight: 700 !important;
+        }
+
+        .run-header .tire-age {
+            color: #222;
+            font-weight: 700;
+        }
+
+        .run-header input,
+        .run-header select {
+            color: #111;
+            font-weight: 700;
+            background: #B3AFAF;
+            border-color: #999;
+        }
+
+        .run-header input.tire-input {
+            background-color: var(--tire-bg) !important;
+            color: var(--tire-color) !important;
+            border-color: var(--tire-bg) !important;
+        }
+
+        .run-header-unit {
+            font-size: 11px;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .run-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+        }
+
+        .btn {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #000;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            border-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .run-config {
+            padding: 8px 12px;
+            background: white;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #555;
+            white-space: nowrap;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 4px 6px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .form-group input[type="number"] {
+            text-align: center;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .tire-selector {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .tire-indicator {
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 10px;
+        }
+
+        .tire-indicator.used {
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 3px,
+                rgba(0,0,0,0.1) 3px,
+                rgba(0,0,0,0.1) 6px
+            );
+        }
+
+        .tire-age {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .form-group select {
+            max-width: 150px;
+        }
+
+        /* Lap Table */
+        .lap-table-container {
+            padding: 3px 6px;
+            background: white;
+            overflow-x: auto;
+        }
+
+        .lap-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            table-layout: auto;
+        }
+
+        .lap-table .col-notes {
+            width: 100%;
+        }
+
+        .lap-table .col-laptype {
+            white-space: nowrap;
+        }
+
+        .lap-table .col-laptype input {
+            min-width: 65px;
+            width: 65px;
+        }
+
+        .lap-table .col-mode {
+            white-space: nowrap;
+        }
+
+        /* Remove dropdown arrow from lap type and mode selects */
+        .lap-table .col-mode select,
+        .lap-table .col-laptype select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            min-width: 65px;
+            width: auto;
+            padding-right: 4px;
+            cursor: pointer;
+            text-align: center;
+            text-align-last: center;
+        }
+
+        .lap-table .col-laptype select {
+            text-transform: capitalize;
+        }
+
+        /* Lap row colouring */
+        .lap-row-grey { background: #E0DDDD; }
+        .lap-mode-dragging { background: #cce5ff !important; }
+        .lap-row-blue       { background: #D6EAF8; }
+        .lap-row-green-soft { background: #D5F5E3; }
+        .lap-row-orange     { background: #FDEBD0; }
+        .lap-row-grey:hover       { background: #cdc9c9; }
+        .lap-row-blue:hover       { background: #C2DCF0; }
+        .lap-row-green-soft:hover { background: #C1ECD4; }
+        .lap-row-orange:hover     { background: #FAD9B5; }
+        .cell-push { background: transparent !important; }
+
+        .lap-table th {
+            background: #f8f9fa;
+            padding: 2px 5px;
+            text-align: center;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            white-space: nowrap;
+            font-size: 11px;
+        }
+
+        .lap-table th.col-notes {
+            text-align: left;
+        }
+
+        .lap-table td {
+            padding: 2px 5px;
+            border-bottom: none;
+            text-align: center;
+        }
+
+        .lap-table td.col-notes {
+            text-align: left;
+        }
+
+        .lap-table td.col-laptype,
+        .lap-table td.col-mode {
+            text-align: center;
+        }
+
+        .lap-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .lap-table input,
+        .lap-table select {
+            width: 100%;
+            padding: 2px 4px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .lap-table .time-warning,
+        .lap-table .fuel-warning {
+            color: #dc3545;
+            font-weight: 700;
+        }
+
+        /* Run Summary */
+        .run-summary {
+            padding: 6px 12px;
+            background: #f8f9fa;
+            display: flex;
+            gap: 15px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+        }
+
+        .run-summary-item {
+            display: flex;
+            gap: 5px;
+        }
+
+        .run-summary-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .run-summary-value.warning {
+            color: #dc3545;
+        }
+
+        .run-summary-value.success {
+            color: #28a745;
+        }
+
+        /* Comments */
+        .run-comments {
+            padding: 8px 12px;
+            background: white;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .run-comments textarea {
+            font-size: 12px;
+        }
+
+        /* Add Run Button */
+        .add-run {
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .btn-add {
+            padding: 6px 12px;
+            background: white;
+            border: 2px dashed #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .btn-add:hover {
+            border-color: #007bff;
+            color: #007bff;
+            background: #f8f9fa;
+        }
+
+        /* Footer */
+        .footer {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .footer-section {
+            margin-bottom: 15px;
+        }
+
+        .footer-section label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .footer-section input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .footer-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-content {
+            margin-bottom: 15px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .lap-type-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .lap-type-row {
+            display: grid;
+            grid-template-columns: 120px 100px 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .lap-type-row label {
+            font-weight: 500;
+        }
+
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .run-config {
+                grid-template-columns: 1fr;
+            }
+
+            .run-comments {
+                grid-template-columns: 1fr;
+            }
+
+            .run-summary {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .timeline-container {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // ===== DATA =====
+
+        // Convert "M:SS.t" string to total seconds
+        function lapToSecs(str) {
+            const [m, s] = str.split(':');
+            return parseInt(m) * 60 + parseFloat(s);
+        }
+
+        // Convert total seconds back to "M:SS.t"
+        function secsToLap(secs) {
+            const m = Math.floor(secs / 60);
+            const s = (secs % 60).toFixed(1);
+            return `${m}:${s.padStart(4, '0')}`;
+        }
+
+        // Build lapTypes from a push lap time string e.g. "1:19.0"
+        // Offsets in seconds: out+27, cool+13, prep+17, in+21, push-in+7, out-in+42
+        function makeLapTypes(pushTime) {
+            const p = lapToSecs(pushTime);
+            return {
+                out:       { time: secsToLap(p + 27), description: "Out lap from pit lane" },
+                push:      { time: secsToLap(p),      description: "Push/qualifying lap" },
+                cool:      { time: secsToLap(p + 13), description: "Cool down lap" },
+                prep:      { time: secsToLap(p + 17), description: "Preparation lap" },
+                in:        { time: secsToLap(p + 21), description: "In lap to pits" },
+                "push-in": { time: secsToLap(p +  7), description: "Push then straight to pits" },
+                "out-in":  { time: secsToLap(p + 42), description: "Out and back in" }
+            };
+        }
+
+        const events = {
+            "R01_AUS": { id:"R01_AUS", eventNumber:"R01", trackCode:"MEL", year:2026, date:"2026-03-08", country:"Australia",  trackName:"Melbourne",         lapLength:5.278, fuelConsumption:1.30, raceLaps:58, tireCompounds:["C2","C3","C4"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:21.0") },
+            "R02_SHA": { id:"R02_SHA", eventNumber:"R02", trackCode:"SHA", year:2026, date:"2026-03-15", country:"China",       trackName:"Shanghai",          lapLength:5.451, fuelConsumption:1.28, raceLaps:56, tireCompounds:["C2","C3","C4"], sessions:[{name:"FP1",start:"12:30",end:"13:30"},{name:"FP2",start:"16:00",end:"17:00"},{name:"FP3",start:"12:30",end:"13:30"}], lapTypes:makeLapTypes("1:30.0") },
+            "R03_SUZ": { id:"R03_SUZ", eventNumber:"R03", trackCode:"SUZ", year:2026, date:"2026-03-29", country:"Japan",       trackName:"Suzuka",            lapLength:5.807, fuelConsumption:1.35, raceLaps:53, tireCompounds:["C2","C3","C4"], sessions:[{name:"FP1",start:"12:30",end:"13:30"},{name:"FP2",start:"16:00",end:"17:00"},{name:"FP3",start:"12:30",end:"13:30"}], lapTypes:makeLapTypes("1:27.0") },
+            "R04_MIA": { id:"R04_MIA", eventNumber:"R04", trackCode:"MIA", year:2026, date:"2026-05-03", country:"USA",         trackName:"Miami",             lapLength:5.412, fuelConsumption:1.25, raceLaps:57, tireCompounds:["C2","C3","C4"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"Sprint",start:"12:00",end:"12:30"},{name:"FP2",start:"16:30",end:"17:30"}], lapTypes:makeLapTypes("1:32.0") },
+            "R05_MTR": { id:"R05_MTR", eventNumber:"R05", trackCode:"MTR", year:2026, date:"2026-05-24", country:"Canada",      trackName:"Montreal",          lapLength:4.361, fuelConsumption:1.20, raceLaps:70, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"10:00",end:"11:00"},{name:"FP2",start:"14:00",end:"15:00"},{name:"FP3",start:"11:00",end:"12:00"}], lapTypes:makeLapTypes("1:19.0") },
+            "R06_MNC": { id:"R06_MNC", eventNumber:"R06", trackCode:"MNC", year:2026, date:"2026-05-28", country:"Monaco",      trackName:"Monaco",            lapLength:3.337, fuelConsumption:1.10, raceLaps:78, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"12:30",end:"13:30"},{name:"FP2",start:"16:00",end:"17:00"},{name:"FP3",start:"12:30",end:"13:30"}], lapTypes:makeLapTypes("1:10.0") },
+            "R07_BCN": { id:"R07_BCN", eventNumber:"R07", trackCode:"BCN", year:2026, date:"2026-06-01", country:"Spain",       trackName:"Barcelona",         lapLength:4.675, fuelConsumption:1.22, raceLaps:66, tireCompounds:["C2","C3","C4"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:14.0") },
+            "R08_MTR": { id:"R08_MTR", eventNumber:"R08", trackCode:"MTR", year:2026, date:"2026-06-15", country:"Canada",      trackName:"Montreal",          lapLength:4.361, fuelConsumption:1.20, raceLaps:70, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"10:00",end:"11:00"},{name:"FP2",start:"14:00",end:"15:00"},{name:"FP3",start:"11:00",end:"12:00"}], lapTypes:makeLapTypes("1:19.0") },
+            "R09_SPI": { id:"R09_SPI", eventNumber:"R09", trackCode:"SPI", year:2026, date:"2026-06-29", country:"Austria",     trackName:"Spielberg",         lapLength:4.318, fuelConsumption:1.18, raceLaps:71, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:04.0") },
+            "R10_SIL": { id:"R10_SIL", eventNumber:"R10", trackCode:"SIL", year:2026, date:"2026-07-05", country:"UK",          trackName:"Silverstone",       lapLength:5.891, fuelConsumption:1.32, raceLaps:52, tireCompounds:["C2","C3","C4"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:24.0") },
+            "R11_SPA": { id:"R11_SPA", eventNumber:"R11", trackCode:"SPA", year:2026, date:"2026-07-26", country:"Belgium",     trackName:"Spa-Francorchamps", lapLength:7.004, fuelConsumption:1.45, raceLaps:44, tireCompounds:["C2","C3","C4"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:40.0") },
+            "R12_BUD": { id:"R12_BUD", eventNumber:"R12", trackCode:"BUD", year:2026, date:"2026-08-02", country:"Hungary",     trackName:"Budapest",          lapLength:4.381, fuelConsumption:1.20, raceLaps:70, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:15.0") },
+            "R13_ZAN": { id:"R13_ZAN", eventNumber:"R13", trackCode:"ZAN", year:2026, date:"2026-08-30", country:"Netherlands", trackName:"Zandvoort",         lapLength:4.259, fuelConsumption:1.18, raceLaps:72, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:10.0") },
+            "R14_MON": { id:"R14_MON", eventNumber:"R14", trackCode:"MON", year:2026, date:"2026-09-06", country:"Italy",       trackName:"Monza",             lapLength:5.793, fuelConsumption:1.30, raceLaps:53, tireCompounds:["C4","C5","C6"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:18.0") },
+            "R15_BAK": { id:"R15_BAK", eventNumber:"R15", trackCode:"BAK", year:2026, date:"2026-09-20", country:"Azerbaijan",  trackName:"Baku",              lapLength:6.003, fuelConsumption:1.35, raceLaps:51, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"13:00",end:"14:00"},{name:"FP2",start:"16:30",end:"17:30"},{name:"FP3",start:"13:00",end:"14:00"}], lapTypes:makeLapTypes("1:40.0") },
+            "R16_SIN": { id:"R16_SIN", eventNumber:"R16", trackCode:"SIN", year:2026, date:"2026-10-04", country:"Singapore",   trackName:"Singapore",         lapLength:5.063, fuelConsumption:1.22, raceLaps:62, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"17:30",end:"18:30"},{name:"FP2",start:"21:00",end:"22:00"},{name:"FP3",start:"17:30",end:"18:30"}], lapTypes:makeLapTypes("1:35.0") },
+            "R17_AUS": { id:"R17_AUS", eventNumber:"R17", trackCode:"AUS", year:2026, date:"2026-10-18", country:"USA",         trackName:"Austin",            lapLength:5.513, fuelConsumption:1.28, raceLaps:56, tireCompounds:["C2","C3","C4"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:30.0") },
+            "R18_MEX": { id:"R18_MEX", eventNumber:"R18", trackCode:"MEX", year:2026, date:"2026-10-25", country:"Mexico",      trackName:"Mexico City",       lapLength:4.304, fuelConsumption:1.18, raceLaps:71, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:15.0") },
+            "R19_SAO": { id:"R19_SAO", eventNumber:"R19", trackCode:"SAO", year:2026, date:"2026-11-08", country:"Brazil",      trackName:"Sao Paulo",         lapLength:4.309, fuelConsumption:1.20, raceLaps:71, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"14:30",end:"15:30"},{name:"Sprint",start:"11:00",end:"11:30"},{name:"FP2",start:"18:00",end:"19:00"}], lapTypes:makeLapTypes("1:10.0") },
+            "R20_VEG": { id:"R20_VEG", eventNumber:"R20", trackCode:"VEG", year:2026, date:"2026-11-22", country:"USA",         trackName:"Las Vegas",         lapLength:6.201, fuelConsumption:1.38, raceLaps:50, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"22:30",end:"23:30"},{name:"FP2",start:"02:00",end:"03:00"},{name:"FP3",start:"22:30",end:"23:30"}], lapTypes:makeLapTypes("1:22.0") },
+            "R21_DOH": { id:"R21_DOH", eventNumber:"R21", trackCode:"DOH", year:2026, date:"2026-11-29", country:"Qatar",       trackName:"Doha",              lapLength:5.419, fuelConsumption:1.26, raceLaps:57, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"17:30",end:"18:30"},{name:"Sprint",start:"14:00",end:"14:30"},{name:"FP2",start:"21:00",end:"22:00"}], lapTypes:makeLapTypes("1:21.0") },
+            "R22_ABU": { id:"R22_ABU", eventNumber:"R22", trackCode:"ABU", year:2026, date:"2026-12-06", country:"UAE",         trackName:"Abu Dhabi",         lapLength:5.281, fuelConsumption:1.25, raceLaps:58, tireCompounds:["C3","C4","C5"], sessions:[{name:"FP1",start:"13:30",end:"14:30"},{name:"FP2",start:"17:00",end:"18:00"},{name:"FP3",start:"13:30",end:"14:30"}], lapTypes:makeLapTypes("1:20.0") }
+        };
+
+        // Utility functions
+        function getTireInfo(compound, eventCompounds) {
+            const index = eventCompounds.indexOf(compound);
+            const roles = ["Hard", "Medium", "Soft"];
+            const colors = ["#FFFFFF", "#FFD700", "#FF0000"];
+
+            return {
+                compound: compound,
+                role: roles[index],
+                color: colors[index],
+                displayName: `${compound} - ${roles[index]}`
+            };
+        }
+
+        function timeStringToMinutes(timeStr) {
+            const parts = timeStr.split(':');
+            const minutes = parseInt(parts[0]);
+            const seconds = parseFloat(parts[1]);
+            return minutes * 60 + seconds;
+        }
+
+        function minutesToTimeString(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = (totalSeconds % 60).toFixed(1);
+            return `${minutes}:${seconds.padStart(4, '0')}`;
+        }
+
+        function timeToHHMMSS(timeStr) {
+            if (timeStr.length === 5) return timeStr + ":00";
+            return timeStr;
+        }
+
+        function addTimeToSessionTime(sessionTime, lapTimeStr) {
+            const [hours, minutes, seconds] = sessionTime.split(':').map(Number);
+            const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+            const lapSeconds = timeStringToMinutes(lapTimeStr);
+            const newTotal = totalSeconds + lapSeconds;
+
+            const newHours = Math.floor(newTotal / 3600);
+            const newMinutes = Math.floor((newTotal % 3600) / 60);
+            const newSeconds = Math.floor(newTotal % 60);
+
+            return `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}:${String(newSeconds).padStart(2, '0')}`;
+        }
+
+        function isTimeAfter(time1, time2) {
+            return time1 > time2;
+        }
+
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // ===== APPLICATION =====
+        class RunPlanApp {
+            constructor() {
+                this.dragMode = null; // tracks active drag state for mode column
+                this.state = {
+                    selectedEventId: "R05_MTR",
+                    car: "CAR 27",
+                    engineer: "John Smith",
+                    issueNumber: 1,
+                    sessions: [],
+                    emailTo: "engineer1@team.com; engineer2@team.com",
+                    emailCC: "tp@team.com; manager@team.com",
+                    editingLapTypes: false,
+                    editingRecipients: false,
+                    editingPDF: false,
+                    tireUsage: {}
+                };
+
+                this.init();
+            }
+
+            init() {
+                this.loadEvent(this.state.selectedEventId);
+                this.render();
+            }
+
+            loadEvent(eventId) {
+                const event = events[eventId];
+                this.currentEvent = event;
+
+                if (this.state.sessions.length === 0) {
+                    // Only load the first session by default
+                    const first = event.sessions[0];
+                    this.state.sessions = [{
+                        name: first.name,
+                        start: first.start,
+                        end: first.end,
+                        visible: true,
+                        collapsed: false,
+                        notes: "",
+                        runs: []
+                    }];
+                }
+            }
+
+            deleteSession(sessionIndex) {
+                if (this.state.sessions.length <= 1) return; // Keep at least one session
+                this.state.sessions.splice(sessionIndex, 1);
+                this.render();
+            }
+
+            copyLastSession() {
+                const sessions = this.state.sessions;
+                if (sessions.length === 0) return;
+                const src = sessions[sessions.length - 1];
+                // Deep clone via JSON
+                const copy = JSON.parse(JSON.stringify(src));
+                copy.name = src.name ? src.name + ' (copy)' : '(copy)';
+                copy.collapsed = false;
+                // Regenerate lap IDs so they're unique
+                copy.runs.forEach(run => {
+                    run.id = generateId();
+                });
+                sessions.push(copy);
+                this.render();
+            }
+
+            addSession() {
+                this.state.sessions.push({
+                    name: "",
+                    start: "09:00",
+                    end: "10:00",
+                    visible: true,
+                    collapsed: false,
+                    notes: "",
+                    runs: []
+                });
+                this.render();
+            }
+
+            addRun(sessionIndex) {
+                const session = this.state.sessions[sessionIndex];
+                const runNumber = session.runs.length + 1;
+                const defaultLaps = 5;
+
+                // Default to highest compound (soft) - e.g., "501" for C5
+                const defaultCompound = this.currentEvent.tireCompounds[2];
+                const defaultTireSet = defaultCompound.charAt(1) + "01";
+                const tireAge = this.state.tireUsage[defaultTireSet] || 0;
+
+                // Use session start as placeholder; recalculateRunTimes will apply garage offset
+                const placeholderStart = timeToHHMMSS(session.start);
+
+                const newRun = {
+                    id: generateId(),
+                    runNumber: runNumber,
+                    tireSet: defaultTireSet,
+                    tireAge: tireAge,
+                    garageTime: runNumber === 1 ? 0 : 5,
+                    startFuel: 30,
+                    notes: "",
+                    laps: this.createDefaultLaps(defaultLaps, placeholderStart),
+                    lapsCollapsed: false
+                };
+
+                session.runs.push(newRun);
+                // Recalculate times properly (applies garage offset)
+                this.recalculateRunTimes(sessionIndex, runNumber - 1);
+                this.updateTireUsage();
+                this.render();
+            }
+
+            createDefaultLaps(count, startTime) {
+                const laps = [];
+                let currentTime = startTime;
+
+                for (let i = 0; i < count; i++) {
+                    // Default lap type based on position
+                    const lapType = i === 0 ? 'out' : (i === count - 1 ? 'in' : 'push');
+                    const lapTime = this.currentEvent.lapTypes[lapType].time;
+                    const mode = this.getModeFromLapType(lapType); // Infer mode from lap type
+
+                    laps.push({
+                        lapNumber: i + 1,
+                        lapType: lapType,
+                        lapTime: lapTime,
+                        startTime: currentTime,
+                        mode: mode,
+                        notes: ""
+                    });
+
+                    currentTime = addTimeToSessionTime(currentTime, lapTime);
+                }
+
+                return laps;
+            }
+
+            deleteRun(sessionIndex, runIndex) {
+                this.state.sessions[sessionIndex].runs.splice(runIndex, 1);
+                this.recalculateRunNumbers(sessionIndex);
+                this.updateTireUsage();
+                this.render();
+            }
+
+            recalculateRunNumbers(sessionIndex) {
+                const session = this.state.sessions[sessionIndex];
+                session.runs.forEach((run, idx) => {
+                    run.runNumber = idx + 1;
+                });
+            }
+
+            updateLapCount(sessionIndex, runIndex, newCount) {
+                const run = this.state.sessions[sessionIndex].runs[runIndex];
+                const currentCount = run.laps.length;
+
+                if (newCount > currentCount) {
+                    // Flip the current last lap from 'in' → 'push' before appending
+                    const prevLast = run.laps[run.laps.length - 1];
+                    if (prevLast.lapType === 'in') {
+                        prevLast.lapType = 'push';
+                        prevLast.lapTime = this.currentEvent.lapTypes['push'].time;
+                        prevLast.mode = this.getModeFromLapType('push');
+                    }
+
+                    const lastLap = run.laps[run.laps.length - 1];
+                    let currentTime = addTimeToSessionTime(lastLap.startTime, lastLap.lapTime);
+
+                    for (let i = currentCount; i < newCount; i++) {
+                        const lapType = i === newCount - 1 ? 'in' : 'push';
+                        const lapTime = this.currentEvent.lapTypes[lapType].time;
+                        const mode = this.getModeFromLapType(lapType);
+
+                        run.laps.push({
+                            lapNumber: i + 1,
+                            lapType: lapType,
+                            lapTime: lapTime,
+                            startTime: currentTime,
+                            mode: mode,
+                            notes: ""
+                        });
+
+                        currentTime = addTimeToSessionTime(currentTime, lapTime);
+                    }
+                } else if (newCount < currentCount) {
+                    run.laps = run.laps.slice(0, newCount);
+                    // Make the new last lap 'in'
+                    const newLast = run.laps[run.laps.length - 1];
+                    if (newLast && newLast.lapType !== 'out') {
+                        newLast.lapType = 'in';
+                        newLast.lapTime = this.currentEvent.lapTypes['in'].time;
+                        newLast.mode = this.getModeFromLapType('in');
+                    }
+                }
+
+                this.recalculateRunTimes(sessionIndex, runIndex);
+                this.updateTireUsage();
+                this.render();
+            }
+
+            insertRunAbove(sessionIndex, runIndex) {
+                const session = this.state.sessions[sessionIndex];
+                const defaultCompound = this.currentEvent.tireCompounds[2];
+                const defaultTireSet = defaultCompound.charAt(1) + "01";
+                const placeholderStart = timeToHHMMSS(session.start);
+
+                const newRun = {
+                    id: generateId(),
+                    runNumber: runIndex + 1,
+                    tireSet: defaultTireSet,
+                    tireAge: 0,
+                    garageTime: runIndex === 0 ? 0 : 5,
+                    startFuel: 30,
+                    notes: "",
+                    laps: this.createDefaultLaps(5, placeholderStart),
+                    lapsCollapsed: false
+                };
+
+                session.runs.splice(runIndex, 0, newRun);
+                this.recalculateRunNumbers(sessionIndex);
+                // Recalculate all run times from the inserted position onwards
+                for (let i = runIndex; i < session.runs.length; i++) {
+                    this.recalculateRunTimes(sessionIndex, i);
+                }
+                this.updateTireUsage();
+                this.render();
+            }
+
+            deleteLap(sessionIndex, runIndex, lapIndex) {
+                const run = this.state.sessions[sessionIndex].runs[runIndex];
+                if (run.laps.length <= 1) return; // Keep at least one lap
+                run.laps.splice(lapIndex, 1);
+                run.laps.forEach((l, i) => l.lapNumber = i + 1);
+                this.recalculateRunTimes(sessionIndex, runIndex);
+                this.render();
+            }
+
+            insertLapAbove(sessionIndex, runIndex, lapIndex) {
+                const run = this.state.sessions[sessionIndex].runs[runIndex];
+                const newLap = {
+                    lapNumber: lapIndex + 1,
+                    lapType: 'push',
+                    lapTime: this.currentEvent.lapTypes['push'].time,
+                    startTime: run.laps[lapIndex].startTime,
+                    mode: 'PUSH',
+                    notes: ""
+                };
+                run.laps.splice(lapIndex, 0, newLap);
+                // Renumber
+                run.laps.forEach((l, i) => l.lapNumber = i + 1);
+                this.recalculateRunTimes(sessionIndex, runIndex);
+                this.render();
+            }
+
+            updateLapType(sessionIndex, runIndex, lapIndex, newType) {
+                const run = this.state.sessions[sessionIndex].runs[runIndex];
+                const lap = run.laps[lapIndex];
+
+                // Ignore if not a valid lap type
+                if (!this.currentEvent.lapTypes[newType]) return;
+
+                lap.lapType = newType;
+                lap.lapTime = this.currentEvent.lapTypes[newType].time;
+                // Auto-update mode based on new lap type
+                lap.mode = this.getModeFromLapType(newType);
+
+                this.recalculateRunTimes(sessionIndex, runIndex);
+                this.render();
+            }
+
+            recalculateAllRunTimes(sessionIndex) {
+                const session = this.state.sessions[sessionIndex];
+                session.runs.forEach((_, i) => this.recalculateRunTimes(sessionIndex, i));
+            }
+
+            recalculateRunTimes(sessionIndex, runIndex) {
+                const session = this.state.sessions[sessionIndex];
+                const run = session.runs[runIndex];
+
+                let startTime;
+                if (runIndex === 0) {
+                    const garageMinutes = run.garageTime || 0;
+                    startTime = addTimeToSessionTime(timeToHHMMSS(session.start), `${garageMinutes}:00.0`);
+                } else {
+                    const prevRun = session.runs[runIndex - 1];
+                    const prevEnd = this.calculateRunEnd(prevRun);
+                    const garageMinutes = run.garageTime || 0;
+                    startTime = addTimeToSessionTime(prevEnd, `${garageMinutes}:00.0`);
+                }
+
+                let currentTime = startTime;
+                run.laps.forEach(lap => {
+                    lap.startTime = currentTime;
+                    currentTime = addTimeToSessionTime(currentTime, lap.lapTime);
+                });
+
+                for (let i = runIndex + 1; i < session.runs.length; i++) {
+                    this.recalculateRunTimes(sessionIndex, i);
+                }
+            }
+
+            calculateRunEnd(run) {
+                const lastLap = run.laps[run.laps.length - 1];
+                return addTimeToSessionTime(lastLap.startTime, lastLap.lapTime);
+            }
+
+            calculateRunDuration(run) {
+                const totalSeconds = run.laps.reduce((sum, lap) => {
+                    return sum + timeStringToMinutes(lap.lapTime);
+                }, 0);
+                return minutesToTimeString(totalSeconds);
+            }
+
+            updateTireUsage() {
+                this.state.tireUsage = {};
+
+                this.state.sessions.forEach(session => {
+                    session.runs.forEach(run => {
+                        const tireSet = run.tireSet;
+                        const lapsUsed = run.laps.length;
+
+                        run.tireAge = this.state.tireUsage[tireSet] || 0;
+                        this.state.tireUsage[tireSet] = (this.state.tireUsage[tireSet] || 0) + lapsUsed;
+                    });
+                });
+            }
+
+            changeTireSet(sessionIndex, runIndex, newTireSet) {
+                this.state.sessions[sessionIndex].runs[runIndex].tireSet = newTireSet;
+                this.updateTireUsage();
+                this.render();
+            }
+
+            getTireCompoundFromSet(tireSet) {
+                // Extract compound from tire set number (e.g., "501" -> "C5")
+                const compoundNum = tireSet.charAt(0);
+                return "C" + compoundNum;
+            }
+
+            getAllowedLapTypes(mode) {
+                // Get allowed lap types based on mode
+                const modeUpper = (mode || "").toUpperCase();
+
+                if (modeUpper === "CHG") {
+                    return ["out", "cool", "prep", "in", "out-in"];
+                } else if (modeUpper === "PUSH") {
+                    return ["push", "push-in"];
+                } else if (modeUpper === "RACE") {
+                    return Object.keys(this.currentEvent.lapTypes); // All types
+                } else {
+                    return Object.keys(this.currentEvent.lapTypes); // Default: all types
+                }
+            }
+
+            lapTypeColor(type) {
+                const map = {
+                    push:      '#00843D',
+                    cool:      '#AED6F1',
+                    'push-in': '#D5F5E3',
+                    prep:      '#FDEBD0',
+                    out:       '#E0DDDD',
+                    in:        '#E0DDDD',
+                    'out-in':  '#E0DDDD'
+                };
+                return map[type] || '#ffffff';
+            }
+
+            lapTypeTextColor(type) {
+                return type === 'push' ? '#ffffff' : '#333333';
+            }
+
+            getModeFromLapType(lapType) {
+                // Infer mode from lap type
+                const pushTypes = ["push", "push-in"];
+                const chgTypes = ["out", "cool", "prep", "in", "out-in"];
+
+                if (pushTypes.includes(lapType)) {
+                    return "PUSH";
+                } else if (chgTypes.includes(lapType)) {
+                    return "CHG";
+                } else {
+                    return "RACE"; // Default for unknown types
+                }
+            }
+
+            render() {
+                const app = document.getElementById('app');
+                app.innerHTML = this.renderHTML();
+                this.attachEventListeners();
+                if (this.pendingFocus) {
+                    const el = document.getElementById(this.pendingFocus);
+                    if (el) el.focus();
+                    this.pendingFocus = null;
+                }
+            }
+
+            renderHTML() {
+                return `
+                    ${this.renderHeader()}
+                    ${this.renderTimeline()}
+                    ${this.renderSessions()}
+                    ${this.renderFooter()}
+                    ${this.state.editingLapTypes ? this.renderLapTypeEditor() : ''}
+                    ${this.state.editingRecipients ? this.renderRecipientsEditor() : ''}
+                    ${this.state.editingPDF ? this.renderPDFSelector() : ''}
+                    <div id="lap-context-menu" style="display:none; position:fixed; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2); z-index:9999; min-width:140px;">
+                        <div id="ctx-add-lap" style="padding:8px 14px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">+ Add lap above</div>
+                        <div style="height:1px; background:#eee; margin:0 8px;"></div>
+                        <div id="ctx-delete-lap" style="padding:8px 14px; cursor:pointer; font-size:13px; color:#c00;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">✕ Delete lap</div>
+                    </div>
+                    <div id="session-context-menu" style="display:none; position:fixed; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2); z-index:9999; min-width:150px;">
+                        <div id="ctx-delete-session" style="padding:8px 14px; cursor:pointer; font-size:13px; color:#c00;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">✕ Delete session</div>
+                    </div>
+                    <div id="run-context-menu" style="display:none; position:fixed; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2); z-index:9999; min-width:150px;">
+                        <div id="ctx-add-run-above" style="padding:8px 14px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">+ Add run above</div>
+                        <div id="ctx-toggle-laps" style="padding:8px 14px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">Collapse laps</div>
+                        <div style="height:1px; background:#eee; margin:0 8px;"></div>
+                        <div id="ctx-delete-run" style="padding:8px 14px; cursor:pointer; font-size:13px; color:#c00;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">✕ Delete run</div>
+                    </div>
+                `;
+            }
+
+            renderHeader() {
+                const event = this.currentEvent;
+                const eventOptions = Object.values(events).map(e =>
+                    `<option value="${e.id}" ${e.id === this.state.selectedEventId ? 'selected' : ''}>
+                        ${e.eventNumber}_${e.trackCode}
+                    </option>`
+                ).join('');
+
+                return `
+                    <div class="header">
+                        <div class="header-logo">
+                            <img src="Audi_Logo.png" alt="Audi" style="height: 28px; width: auto;">
+                        </div>
+                        <div class="header-divider"></div>
+                        <select class="header-event-select" id="eventSelect">
+                            ${eventOptions}
+                        </select>
+                        <div class="header-track-info">
+                            <span>${event.lapLength} km &middot; ${event.fuelConsumption} kg/lap &middot; ${event.date}</span>
+                            <button class="header-btn" data-action="editLapTypes">Edit Lap Times</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderTimeline() {
+                let timelineHTML = '<div class="timeline-container"><div class="timeline">';
+
+                // Compute the longest totalSpan across all visible sessions for a shared scale
+                let globalMaxSpan = 0;
+                this.state.sessions.forEach(session => {
+                    if (!session.visible || session.runs.length === 0) return;
+                    const sessionStart = this.parseTime(session.start);
+                    const sessionEnd   = this.parseTime(session.end);
+                    let maxEnd = sessionEnd + 2; // at least 2 min beyond session end
+                    session.runs.forEach(run => {
+                        const re = this.parseTime(this.calculateRunEnd(run));
+                        if (re > maxEnd) maxEnd = re;
+                    });
+                    maxEnd = Math.max(maxEnd, sessionEnd + 2);
+                    const span = maxEnd - sessionStart;
+                    if (span > globalMaxSpan) globalMaxSpan = span;
+                });
+
+                this.state.sessions.forEach((session, sessionIdx) => {
+                    if (!session.visible || session.runs.length === 0) return;
+
+                    const sessionStart = this.parseTime(session.start);
+                    const sessionEnd   = this.parseTime(session.end);
+                    const sessionDuration = sessionEnd - sessionStart;
+
+                    // Find the furthest point any run extends (may exceed sessionEnd)
+                    let maxEnd = sessionEnd + 2;
+                    session.runs.forEach(run => {
+                        const re = this.parseTime(this.calculateRunEnd(run));
+                        if (re > maxEnd) maxEnd = re;
+                    });
+                    maxEnd = Math.max(maxEnd, sessionEnd + 2);
+
+                    // Use globalMaxSpan for shared horizontal scale
+                    const totalSpan = globalMaxSpan;
+
+                    // Session-end line and flag are at their proportional position within totalSpan
+                    const sessionEndPct = ((sessionEnd - sessionStart) / totalSpan) * 100;
+
+                    // Build 10-minute tick marks across totalSpan
+                    let tickLines = '';
+                    let tickLabels = '';
+                    for (let t = 10; t < totalSpan; t += 10) {
+                        const tickPct = (t / totalSpan) * 100;
+                        const tickMin = sessionStart + t;
+                        const tickH = Math.floor(tickMin / 60);
+                        const tickM = Math.floor(tickMin % 60);
+                        const tickLabel = `${String(tickH).padStart(2,'0')}:${String(tickM).padStart(2,'0')}`;
+                        tickLines  += `<div class="timeline-tick" style="left:${tickPct.toFixed(3)}%"><div class="timeline-tick-line"></div></div>`;
+                        tickLabels += `<div class="timeline-tick-label-header" style="left:${tickPct.toFixed(3)}%">${tickLabel}</div>`;
+                    }
+
+                    // Checkered flag in header at session end position
+                    const flagLabel = `<div class="timeline-session-end-flag" style="left:${sessionEndPct.toFixed(3)}%">🏁</div>`;
+
+                    const lapColour = (type) => {
+                        if (type === 'push')    return '#00843D';
+                        if (type === 'cool')    return '#D6EAF8';
+                        if (type === 'push-in') return '#D5F5E3';
+                        if (type === 'prep')    return '#FDEBD0';
+                        return '#E0DDDD'; // out, in, out-in
+                    };
+
+                    timelineHTML += `<div class="timeline-session">
+                        <div class="timeline-session-label">
+                            <span class="timeline-session-label-text"><strong>${session.name || '(unnamed)'}</strong> &nbsp; ${session.start} – ${session.end}</span>
+                            ${tickLabels}
+                            ${flagLabel}
+                        </div>
+                        <div class="timeline-bar-row">
+                            ${tickLines}
+                            <div class="timeline-session-end" style="left:${sessionEndPct.toFixed(3)}%" title="Session end: ${session.end}"></div>
+                            <div class="timeline-runs">`;
+
+                    session.runs.forEach((run, runIdx) => {
+                        const runStart = this.parseTime(run.laps[0].startTime);
+                        const runEnd   = this.parseTime(this.calculateRunEnd(run));
+                        const runDuration = runEnd - runStart;
+
+                        const leftPercent  = ((runStart - sessionStart) / totalSpan) * 100;
+                        const widthPercent = (runDuration / totalSpan) * 100;
+
+                        const tireSet = run.tireSet || "501";
+                        const compound = this.getTireCompoundFromSet(tireSet);
+                        const tireInfo = getTireInfo(compound, this.currentEvent.tireCompounds);
+                        const headerBg = tireInfo.color;
+
+                        const totalRunSeconds = run.laps.reduce((s, l) => s + timeStringToMinutes(l.lapTime), 0);
+                        let lapSegs = run.laps.map(lap => {
+                            const pct = (timeStringToMinutes(lap.lapTime) / totalRunSeconds * 100).toFixed(3);
+                            const label = lap.lapType.charAt(0).toUpperCase() + lap.lapType.slice(1);
+                            const labelColor = lap.lapType === 'push' ? '#fff' : 'rgba(0,0,0,0.65)';
+                            return `<div class="timeline-lap-seg" style="width:${pct}%; background:${lapColour(lap.lapType)};"
+                                        title="${lap.lapType}">
+                                        <span class="timeline-lap-label" style="color:${labelColor};">${label}</span>
+                                    </div>`;
+                        }).join('');
+
+                        timelineHTML += `
+                            <div class="timeline-run"
+                                 style="left: ${leftPercent.toFixed(3)}%; width: ${widthPercent.toFixed(3)}%;"
+                                 title="Run ${run.runNumber}: ${run.laps.length} laps on ${tireSet} (${tireInfo.displayName})">
+                                <div class="timeline-run-header" style="background:${headerBg}; color:${tireInfo.role === 'Soft' ? '#fff' : '#000'};">R${run.runNumber} &middot; ${run.tireAge > 0 ? 'Used' : 'New'} ${compound} (${tireSet}) &middot; ${run.startFuel ?? 30} kg</div>
+                                <div class="timeline-run-laps">${lapSegs}</div>
+                            </div>
+                        `;
+                    });
+
+                    timelineHTML += '</div></div></div>';
+                });
+
+                timelineHTML += '</div></div>';
+                return timelineHTML;
+            }
+
+            parseTime(timeStr) {
+                const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+                return hours * 60 + minutes + (seconds || 0) / 60;
+            }
+
+            renderSessions() {
+                return `
+                    <div class="sessions">
+                        ${this.state.sessions.map((session, idx) => this.renderSession(session, idx)).join('')}
+                        <div class="add-run" style="margin-top: 5px; display: flex; gap: 8px; justify-content: center;">
+                            <button class="btn-add" data-action="addSession">+ Add Session</button>
+                            <button class="btn-add" data-action="copySession">⧉ Copy Session Above</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderSession(session, sessionIndex) {
+                const expandIcon = session.collapsed ? '▶' : '▼';
+
+                const totalLaps = session.runs.reduce((s, r) => s + r.laps.length, 0);
+                const totalMileage = (totalLaps * this.currentEvent.lapLength).toFixed(1);
+
+                return `
+                    <div class="session">
+                        <div class="session-header" data-session="${sessionIndex}">
+                            <div class="session-title">
+                                <span>${expandIcon}</span>
+                                <input type="text" value="${session.name}" placeholder="Session name"
+                                       data-action="updateSessionName" data-session="${sessionIndex}"
+                                       onclick="event.stopPropagation()"
+                                       style="font-size:14px; font-weight:600; background:transparent; border:none; color:white; width:80px; padding:0 2px;">
+                                <input type="text" value="${session.start}" placeholder="09:00"
+                                       data-action="updateSessionStart" data-session="${sessionIndex}"
+                                       onclick="event.stopPropagation()"
+                                       style="font-size:12px; background:transparent; border:none; color:#ccc; width:45px; padding:0 2px; margin-left:8px;">
+                                <span style="color:#ccc; font-size:12px;">–</span>
+                                <input type="text" value="${session.end}" placeholder="10:00"
+                                       data-action="updateSessionEnd" data-session="${sessionIndex}"
+                                       onclick="event.stopPropagation()"
+                                       style="font-size:12px; background:transparent; border:none; color:#ccc; width:45px; padding:0 2px;">
+                                <span style="color:#666; font-size:11px; margin-left:10px;">│</span>
+                                <span style="color:#aaa; font-size:12px;">${totalLaps} laps</span>
+                                <span style="color:#555; font-size:12px;">·</span>
+                                <span style="color:#aaa; font-size:12px;">${totalMileage} km</span>
+                            </div>
+                            <div class="session-summary" onclick="event.stopPropagation()">
+                                <span class="session-summary-item" style="flex-grow:1;">
+                                    <span class="session-summary-label">Notes:</span>
+                                    <input type="text" value="${session.notes || ''}" placeholder="—"
+                                           data-action="updateSessionNotes" data-session="${sessionIndex}"
+                                           onclick="event.stopPropagation()"
+                                           style="background:transparent; border:none; color:white; font-size:12px; flex-grow:1; width:100%; padding:0 2px;">
+                                </span>
+                            </div>
+                        </div>
+                        <div class="session-content ${session.collapsed ? 'collapsed' : ''}">
+                            <div class="runs">
+                                ${session.runs.length > 0
+                                    ? session.runs.map((run, idx) => this.renderRun(run, sessionIndex, idx)).join('')
+                                    : '<div class="no-runs">No runs planned yet</div>'
+                                }
+                            </div>
+                            <div class="add-run">
+                                <button class="btn-add" data-action="addRun" data-session="${sessionIndex}">+ Add Run</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderRun(run, sessionIndex, runIndex) {
+                const session = this.state.sessions[sessionIndex];
+                const tireSet = run.tireSet || "501";
+                const compound = this.getTireCompoundFromSet(tireSet);
+                const tireInfo = getTireInfo(compound, this.currentEvent.tireCompounds);
+                const duration = this.calculateRunDuration(run);
+                const endTime = this.calculateRunEnd(run);
+                const sessionEnd = timeToHHMMSS(session.end);
+                const exceedsTime = isTimeAfter(endTime, sessionEnd);
+
+                const totalDistance = (run.laps.length * this.currentEvent.lapLength).toFixed(1);
+
+                return `
+                    <div class="run-card">
+                        <div class="run-header" data-session="${sessionIndex}" data-run="${runIndex}">
+                            <span class="run-title">Run ${run.runNumber}</span>
+                            <div class="form-group">
+                                <label>Garage Time:</label>
+                                <input type="number" value="${run.garageTime || 0}" min="0" max="60" step="1"
+                                       style="width: 50px; text-align: center;"
+                                       data-action="changeGarageTime" data-session="${sessionIndex}" data-run="${runIndex}">
+                                <span class="run-header-unit">min</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Tire:</label>
+                                <input type="text" value="${tireSet}" placeholder="501"
+                                       class="tire-input"
+                                       style="width: 50px; text-align: center; --tire-bg: ${tireInfo.color}; --tire-color: ${tireInfo.role === 'Soft' ? '#fff' : '#000'};"
+                                       data-action="changeTireSet" data-session="${sessionIndex}" data-run="${runIndex}">
+                                <div class="tire-indicator" style="background-color: ${tireInfo.color}; color: ${tireInfo.role === 'Soft' ? '#fff' : '#000'}; font-weight: 700;">${compound}</div>
+                                <span class="tire-age">${run.tireAge > 0 ? `Used ${run.tireAge}L` : 'New'}</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Laps:</label>
+                                <input type="number" value="${run.laps.length}" min="1" max="50"
+                                       style="width: 50px; text-align: center;"
+                                       data-action="changeLapCount" data-session="${sessionIndex}" data-run="${runIndex}">
+                            </div>
+                            <div class="form-group">
+                                <label>Fuel:</label>
+                                <input type="text" value="${run.startFuel ?? 30}"
+                                       style="width: 50px; text-align: center;"
+                                       data-action="changeStartFuel" data-session="${sessionIndex}" data-run="${runIndex}">
+                                <span class="run-header-unit">kg</span>
+                            </div>
+                            <div class="form-group" style="flex-grow: 1;">
+                                <label>Notes:</label>
+                                <input type="text" value="${run.notes || ''}" placeholder=""
+                                       style="flex-grow: 1; min-width: 150px;"
+                                       data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">
+                            </div>
+                        </div>
+                        ${!run.lapsCollapsed ? `
+                            <div class="lap-table-container">
+                                <table class="lap-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Lap</th>
+                                            <th class="col-laptype">Lap Type</th>
+                                            <th class="col-mode">Mode</th>
+                                            <th class="col-notes">Notes</th>
+                                            <th>Start Time</th>
+                                            <th>Est. LapTime</th>
+                                            <th>End Fuel</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${run.laps.map((lap, lapIdx) => {
+                                            const lapEnd = addTimeToSessionTime(lap.startTime, lap.lapTime);
+                                            const fuelAtEnd = ((run.startFuel ?? 30) - (lapIdx + 1) * this.currentEvent.fuelConsumption).toFixed(1);
+                                            const lapMode = lap.mode || this.getModeFromLapType(lap.lapType);
+                                            const startOverTime = isTimeAfter(lap.startTime, sessionEnd);
+                                            const greyTypes = ['out', 'in', 'out-in'];
+                                            const rowClass = lap.lapType === 'cool'    ? 'lap-row-blue'
+                                                : lap.lapType === 'push-in' ? 'lap-row-green-soft'
+                                                : lap.lapType === 'prep'    ? 'lap-row-orange'
+                                                : greyTypes.includes(lap.lapType) ? 'lap-row-grey' : '';
+                                            // Ordered so push comes before prep
+                                            const typeOrder = ['push', 'cool', 'out', 'in', 'prep', 'push-in', 'out-in'];
+
+                                            return `
+                                                <tr class="${rowClass}" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
+                                                    <td>${lap.lapNumber}</td>
+                                                    <td class="col-laptype">
+                                                        <select data-action="changeLapType" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
+                                                                id="laptype-${sessionIndex}-${runIndex}-${lapIdx}"
+                                                                style="background:${this.lapTypeColor(lap.lapType)}; color:${this.lapTypeTextColor(lap.lapType)};">
+                                                            ${typeOrder.map(type =>
+                                                                `<option value="${type}" ${type === lap.lapType ? 'selected' : ''}
+                                                                    style="background:${this.lapTypeColor(type)}; color:${this.lapTypeTextColor(type)};">${type}</option>`
+                                                            ).join('')}
+                                                        </select>
+                                                    </td>
+                                                    <td class="col-mode" data-mode-cell="1" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
+                                                        <input type="text"
+                                                               value="${lapMode}"
+                                                               data-action="changeLapMode" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
+                                                               style="width:60px; text-align:center; cursor:text;"
+                                                               readonly>
+                                                    </td>
+                                                    <td class="col-notes">
+                                                        <input type="text" value="${lap.notes || ''}" placeholder=""
+                                                               data-action="changeLapNotes" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
+                                                               id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}"
+                                                               style="width: 100%;">
+                                                    </td>
+                                                    <td class="${startOverTime ? 'time-warning' : ''}">${lap.startTime}</td>
+                                                    <td>${lap.lapTime}</td>
+                                                    <td class="${parseFloat(fuelAtEnd) <= 0 ? 'fuel-warning' : ''}">${fuelAtEnd}</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            renderFooter() {
+                return `
+                    <div class="footer">
+                        <div class="footer-actions">
+                            <label style="margin-right: auto; display: flex; align-items: center; gap: 10px;">
+                                Issue #: <input type="number" id="issueNumber" value="${this.state.issueNumber}" style="width: 60px; text-align: center;">
+                            </label>
+                            <button class="btn" data-action="editRecipients">Email Recipient List</button>
+                            <button class="btn" data-action="saveDraft">Save Draft</button>
+                            <button class="btn btn-primary" data-action="generatePDF">Generate PDF</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderRecipientsEditor() {
+                return `
+                    <div class="modal-overlay">
+                        <div class="modal">
+                            <div class="modal-header">Email Recipients</div>
+                            <div class="modal-content">
+                                <div class="lap-type-editor">
+                                    <div class="lap-type-row">
+                                        <label>To:</label>
+                                        <input type="text" id="emailTo" value="${this.state.emailTo}" style="flex: 1; min-width: 300px;" placeholder="email1@team.com; email2@team.com">
+                                    </div>
+                                    <div class="lap-type-row">
+                                        <label>CC:</label>
+                                        <input type="text" id="emailCC" value="${this.state.emailCC}" style="flex: 1; min-width: 300px;" placeholder="email3@team.com">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-actions">
+                                <button class="btn" data-action="cancelRecipients">Cancel</button>
+                                <button class="btn btn-primary" data-action="saveRecipients">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderLapTypeEditor() {
+                const lapTypesHTML = Object.entries(this.currentEvent.lapTypes).map(([type, data]) => `
+                    <div class="lap-type-row">
+                        <label>${type}</label>
+                        <input type="text" value="${data.time}" data-laptype="${type}">
+                        <span style="font-size: 12px; color: #666;">${data.description}</span>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="modal-overlay" id="lapTypeModal">
+                        <div class="modal">
+                            <div class="modal-header">
+                                Edit Lap Type Times - ${this.currentEvent.trackName} (${this.currentEvent.trackCode})
+                            </div>
+                            <div class="modal-content">
+                                <div class="lap-type-editor">
+                                    ${lapTypesHTML}
+                                </div>
+                            </div>
+                            <div class="modal-actions">
+                                <button class="btn" data-action="cancelLapTypes">Cancel</button>
+                                <button class="btn btn-primary" data-action="saveLapTypes">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderPDFSelector() {
+                const rows = this.state.sessions.map((s, i) => {
+                    const totalLaps = s.runs.reduce((sum, r) => sum + r.laps.length, 0);
+                    const label = (s.name || `Session ${i + 1}`) + ` — ${s.runs.length} run${s.runs.length !== 1 ? 's' : ''}, ${totalLaps} laps`;
+                    return `
+                        <label style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid #eee; cursor:pointer; font-size:14px;">
+                            <input type="checkbox" class="pdf-session-check" data-session="${i}" checked style="width:16px; height:16px;">
+                            ${label}
+                        </label>`;
+                }).join('');
+                return `
+                    <div class="modal-overlay">
+                        <div class="modal">
+                            <div class="modal-header">Generate PDF — Select Sessions</div>
+                            <div class="modal-content">
+                                <p style="font-size:13px; color:#666; margin-bottom:12px;">Choose which sessions to include in the PDF:</p>
+                                ${rows}
+                            </div>
+                            <div class="modal-actions">
+                                <button class="btn" data-action="cancelPDF">Cancel</button>
+                                <button class="btn btn-primary" data-action="confirmPDF">Generate PDF</button>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            generatePDFFromSections(sessionIndices) {
+                if (sessionIndices.length === 0) return;
+
+                // Grab all the CSS from the current page
+                const css = Array.from(document.styleSheets).map(sheet => {
+                    try {
+                        return Array.from(sheet.cssRules).map(r => r.cssText).join('\n');
+                    } catch(e) { return ''; }
+                }).join('\n');
+
+                // Map rendered timeline rows → session indices
+                // Timeline only renders sessions that have runs
+                const visibleWithRuns = this.state.sessions
+                    .map((s, i) => s.runs.length > 0 ? i : -1)
+                    .filter(i => i >= 0);
+
+                const allSessionEls = Array.from(document.querySelectorAll('.session'));
+                const tlContainer   = document.querySelector('.timeline-container');
+                const allTlRows     = tlContainer ? Array.from(tlContainer.querySelectorAll('.timeline-session')) : [];
+                const headerEl      = document.querySelector('.header');
+
+                // Build one HTML string with one section per selected session
+                const pagesHTML = sessionIndices.map((sessionIdx, pagePos) => {
+                    const parts = [];
+
+                    // ── Header ──
+                    if (headerEl) {
+                        const h = headerEl.cloneNode(true);
+                        h.querySelectorAll('button, select').forEach(el => el.remove());
+                        h.style.marginBottom = '8px';
+                        parts.push(h.outerHTML);
+                    }
+
+                    // ── Timeline row for this session ──
+                    if (tlContainer) {
+                        const tlClone = tlContainer.cloneNode(true);
+                        const rows = tlClone.querySelectorAll('.timeline-session');
+                        rows.forEach((row, rowPos) => {
+                            if (visibleWithRuns[rowPos] !== sessionIdx) row.remove();
+                        });
+                        tlClone.style.marginBottom = '8px';
+                        parts.push(tlClone.outerHTML);
+                    }
+
+                    // ── Session card ──
+                    const sessionEl = allSessionEls[sessionIdx];
+                    if (sessionEl) {
+                        const sc = sessionEl.cloneNode(true);
+                        // Expand collapsed laps
+                        sc.querySelectorAll('.session-content.collapsed')
+                          .forEach(el => el.classList.remove('collapsed'));
+                        // Remove all add-run / add-session buttons
+                        sc.querySelectorAll('.add-run').forEach(el => el.remove());
+                        parts.push(sc.outerHTML);
+                    }
+
+                    const pageBreak = pagePos < sessionIndices.length - 1
+                        ? 'page-break-after:always; break-after:page;' : '';
+                    return `<div style="background:#fff; padding:0; ${pageBreak}">${parts.join('')}</div>`;
+                }).join('');
+
+                const html = `<!DOCTYPE html><html><head>
+                    <meta charset="UTF-8">
+                    <title>F1 Run Plan</title>
+                    <style>
+                        ${css}
+                        @page { size: A4 portrait; margin: 10mm; }
+                        * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+                        body { background:#fff; margin:0; padding:0; max-width:none; }
+                        #app { padding:0; max-width:none; }
+                        button, input[type=button], input[type=submit] { display:none !important; }
+                        .header-btn { display:none !important; }
+                        .run-card { page-break-inside:avoid; break-inside:avoid; }
+                    </style>
+                </head><body><div id="app">${pagesHTML}</div></body></html>`;
+
+                const outputWin = window.open('', '_blank');
+                if (!outputWin) { alert('Please allow popups for this page and try again.'); return; }
+                outputWin.document.write(html);
+                outputWin.document.close();
+                // Small delay lets the browser finish rendering before print dialog
+                setTimeout(() => { outputWin.focus(); outputWin.print(); }, 500);
+            }
+
+            attachEventListeners() {
+                // Use event delegation on the app root to avoid duplicate listeners
+                const app = document.getElementById('app');
+
+                // Context menus
+                app.oncontextmenu = (e) => {
+                    if (this._suppressNextContextMenu) {
+                        this._suppressNextContextMenu = false;
+                        e.preventDefault();
+                        return;
+                    }
+                    // Hide all menus first
+                    document.getElementById('lap-context-menu').style.display = 'none';
+                    document.getElementById('run-context-menu').style.display = 'none';
+                    document.getElementById('session-context-menu').style.display = 'none';
+
+                    // Session header right-click (must check before run-header since it's a parent)
+                    const sessionHeader = e.target.closest('.session-header[data-session]');
+                    const runHeader = e.target.closest('.run-header[data-run]');
+                    if (sessionHeader && !runHeader) {
+                        e.preventDefault();
+                        const menu = document.getElementById('session-context-menu');
+                        menu.style.display = 'block';
+                        menu.style.left = e.clientX + 'px';
+                        menu.style.top  = e.clientY + 'px';
+                        menu.dataset.session = sessionHeader.dataset.session;
+                        return;
+                    }
+
+                    // Run header right-click
+                    if (runHeader) {
+                        e.preventDefault();
+                        const sIdx = parseInt(runHeader.dataset.session);
+                        const rIdx = parseInt(runHeader.dataset.run);
+                        const isCollapsed = this.state.sessions[sIdx].runs[rIdx].lapsCollapsed;
+                        const menu = document.getElementById('run-context-menu');
+                        menu.style.display = 'block';
+                        menu.style.left = e.clientX + 'px';
+                        menu.style.top  = e.clientY + 'px';
+                        menu.dataset.session = sIdx;
+                        menu.dataset.run     = rIdx;
+                        document.getElementById('ctx-toggle-laps').textContent = isCollapsed ? 'Expand laps' : 'Collapse laps';
+                        return;
+                    }
+
+                    // Lap row right-click
+                    const tr = e.target.closest('tr[data-lap]');
+                    if (tr) {
+                        e.preventDefault();
+                        const menu = document.getElementById('lap-context-menu');
+                        menu.style.display = 'block';
+                        menu.style.left = e.clientX + 'px';
+                        menu.style.top  = e.clientY + 'px';
+                        menu.dataset.session = tr.dataset.session;
+                        menu.dataset.run     = tr.dataset.run;
+                        menu.dataset.lap     = tr.dataset.lap;
+                    }
+                };
+
+                // Dismiss all menus on any click
+                document.onclick = () => {
+                    ['lap-context-menu','run-context-menu','session-context-menu'].forEach(id => {
+                        const m = document.getElementById(id);
+                        if (m) m.style.display = 'none';
+                    });
+                };
+
+                // Context menu item actions
+                const ctxAddLap = document.getElementById('ctx-add-lap');
+                if (ctxAddLap) {
+                    ctxAddLap.onclick = (e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById('lap-context-menu');
+                        menu.style.display = 'none';
+                        this.insertLapAbove(
+                            parseInt(menu.dataset.session),
+                            parseInt(menu.dataset.run),
+                            parseInt(menu.dataset.lap)
+                        );
+                    };
+                }
+
+                const ctxDeleteLap = document.getElementById('ctx-delete-lap');
+                if (ctxDeleteLap) {
+                    ctxDeleteLap.onclick = (e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById('lap-context-menu');
+                        menu.style.display = 'none';
+                        this.deleteLap(
+                            parseInt(menu.dataset.session),
+                            parseInt(menu.dataset.run),
+                            parseInt(menu.dataset.lap)
+                        );
+                    };
+                }
+
+                const ctxDeleteSession = document.getElementById('ctx-delete-session');
+                if (ctxDeleteSession) {
+                    ctxDeleteSession.onclick = (e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById('session-context-menu');
+                        menu.style.display = 'none';
+                        this.deleteSession(parseInt(menu.dataset.session));
+                    };
+                }
+
+                const ctxAddRunAbove = document.getElementById('ctx-add-run-above');
+                if (ctxAddRunAbove) {
+                    ctxAddRunAbove.onclick = (e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById('run-context-menu');
+                        menu.style.display = 'none';
+                        this.insertRunAbove(parseInt(menu.dataset.session), parseInt(menu.dataset.run));
+                    };
+                }
+
+                const ctxToggleLaps = document.getElementById('ctx-toggle-laps');
+                if (ctxToggleLaps) {
+                    ctxToggleLaps.onclick = (e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById('run-context-menu');
+                        menu.style.display = 'none';
+                        const sIdx = parseInt(menu.dataset.session);
+                        const rIdx = parseInt(menu.dataset.run);
+                        this.state.sessions[sIdx].runs[rIdx].lapsCollapsed =
+                            !this.state.sessions[sIdx].runs[rIdx].lapsCollapsed;
+                        this.render();
+                    };
+                }
+
+                const ctxDeleteRun = document.getElementById('ctx-delete-run');
+                if (ctxDeleteRun) {
+                    ctxDeleteRun.onclick = (e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById('run-context-menu');
+                        menu.style.display = 'none';
+                        this.deleteRun(parseInt(menu.dataset.session), parseInt(menu.dataset.run));
+                    };
+                }
+
+                app.onclick = (e) => {
+                    const target = e.target;
+                    const action = target.dataset.action;
+
+                    if (!action) {
+                        // Check for session header clicks
+                        const sessionHeader = target.closest('.session-header');
+                        if (sessionHeader) {
+                            const sessionIndex = parseInt(sessionHeader.dataset.session);
+                            this.state.sessions[sessionIndex].collapsed = !this.state.sessions[sessionIndex].collapsed;
+                            this.render();
+                        }
+                        return;
+                    }
+
+                    const sessionIdx = parseInt(target.dataset.session);
+                    const runIdx = parseInt(target.dataset.run);
+
+                    switch (action) {
+                        case 'addRun':
+                            e.preventDefault();
+                            this.addRun(sessionIdx);
+                            break;
+                        case 'addSession':
+                            e.preventDefault();
+                            this.addSession();
+                            break;
+                        case 'copySession':
+                            e.preventDefault();
+                            this.copyLastSession();
+                            break;
+                        case 'deleteRun':
+                            e.preventDefault();
+                            this.deleteRun(sessionIdx, runIdx);
+                            break;
+                        case 'toggleLaps':
+                            e.preventDefault();
+                            this.state.sessions[sessionIdx].runs[runIdx].lapsCollapsed =
+                                !this.state.sessions[sessionIdx].runs[runIdx].lapsCollapsed;
+                            this.render();
+                            break;
+                        case 'editLapTypes':
+                            this.state.editingLapTypes = true;
+                            this.render();
+                            break;
+                        case 'saveLapTypes':
+                            document.querySelectorAll('[data-laptype]').forEach(input => {
+                                const lapType = input.dataset.laptype;
+                                this.currentEvent.lapTypes[lapType].time = input.value;
+                            });
+                            this.state.editingLapTypes = false;
+                            // Recalculate all run times across all sessions
+                            this.state.sessions.forEach((session, sIdx) => {
+                                session.runs.forEach((run, rIdx) => {
+                                    run.laps.forEach(lap => {
+                                        if (this.currentEvent.lapTypes[lap.lapType]) {
+                                            lap.lapTime = this.currentEvent.lapTypes[lap.lapType].time;
+                                        }
+                                    });
+                                    this.recalculateRunTimes(sIdx, rIdx);
+                                });
+                            });
+                            this.render();
+                            break;
+                        case 'cancelLapTypes':
+                            this.state.editingLapTypes = false;
+                            this.render();
+                            break;
+                        case 'editRecipients':
+                            this.state.editingRecipients = true;
+                            this.render();
+                            break;
+                        case 'saveRecipients':
+                            this.state.emailTo = document.getElementById('emailTo').value;
+                            this.state.emailCC = document.getElementById('emailCC').value;
+                            this.state.editingRecipients = false;
+                            this.render();
+                            break;
+                        case 'cancelRecipients':
+                            this.state.editingRecipients = false;
+                            this.render();
+                            break;
+                        case 'saveDraft':
+                            localStorage.setItem('runPlanDraft', JSON.stringify(this.state));
+                            alert('Draft saved successfully!');
+                            break;
+                        case 'generatePDF':
+                            this.state.editingPDF = true;
+                            this.render();
+                            break;
+                        case 'confirmPDF': {
+                            const selected = Array.from(document.querySelectorAll('.pdf-session-check:checked'))
+                                .map(cb => parseInt(cb.dataset.session));
+                            this.state.editingPDF = false;
+                            this.render();
+                            this.generatePDFFromSections(selected);
+                            break;
+                        }
+                        case 'cancelPDF':
+                            this.state.editingPDF = false;
+                            this.render();
+                            break;
+                    }
+                };
+
+                // Keyboard handler for lap type selects:
+                // - Letter keys visually select the preferred match (no commit yet)
+                // - Enter commits the current value and advances to next lap
+                // - Tab commits and advances (browser default already moves focus,
+                //   but we still need to commit the value)
+                // Mode column: left click  = editable text, text selected so typing replaces it
+                //              right-drag  = paint value across multiple laps on release
+                app.onmousedown = (e) => {
+                    const cell = e.target.closest('td[data-mode-cell]');
+                    if (!cell) return;
+
+                    const sIdx = parseInt(cell.dataset.session);
+                    const rIdx = parseInt(cell.dataset.run);
+                    const lIdx = parseInt(cell.dataset.lap);
+                    const input = cell.querySelector('input');
+
+                    if (e.button === 2) {
+                        // Right mouse button — start drag-paint
+                        e.preventDefault();
+                        this.dragMode = { sIdx, rIdx, startLap: lIdx, endLap: lIdx, dragged: false, isRightDrag: true };
+                        if (input) this.dragMode.sourceValue = input.value.trim();
+                        return;
+                    }
+
+                    // Left click — make editable and select all text so user can type to replace
+                    if (input) {
+                        input.removeAttribute('readonly');
+                        input.focus();
+                        // setTimeout so the selection survives the mouseup that follows mousedown
+                        setTimeout(() => input.select(), 0);
+
+                        input.onblur = () => {
+                            const val = input.value.trim();
+                            if (val) this.state.sessions[sIdx].runs[rIdx].laps[lIdx].mode = val;
+                            this.render();
+                        };
+                    }
+                };
+
+                app.onmouseover = (e) => {
+                    if (!this.dragMode || !this.dragMode.isRightDrag) return;
+                    if (!(e.buttons & 2)) { this.dragMode = null; return; }
+                    const cell = e.target.closest('td[data-mode-cell]');
+                    if (!cell) return;
+                    const sIdx = parseInt(cell.dataset.session);
+                    const rIdx = parseInt(cell.dataset.run);
+                    if (sIdx !== this.dragMode.sIdx || rIdx !== this.dragMode.rIdx) return;
+
+                    const newLap = parseInt(cell.dataset.lap);
+                    if (newLap !== this.dragMode.endLap) this.dragMode.dragged = true;
+                    this.dragMode.endLap = newLap;
+
+                    const lo = Math.min(this.dragMode.startLap, this.dragMode.endLap);
+                    const hi = Math.max(this.dragMode.startLap, this.dragMode.endLap);
+
+                    document.querySelectorAll('td[data-mode-cell]').forEach(c => {
+                        const cs = parseInt(c.dataset.session);
+                        const cr = parseInt(c.dataset.run);
+                        const cl = parseInt(c.dataset.lap);
+                        const tr = c.closest('tr');
+                        if (cs === sIdx && cr === rIdx && cl >= lo && cl <= hi) {
+                            tr.classList.add('lap-mode-dragging');
+                        } else {
+                            tr.classList.remove('lap-mode-dragging');
+                        }
+                    });
+                };
+
+                document.addEventListener('mouseup', (e) => {
+                    if (!this.dragMode || !this.dragMode.isRightDrag) return;
+
+                    const { sIdx, rIdx, startLap, endLap, sourceValue, dragged } = this.dragMode;
+                    this.dragMode = null;
+                    document.querySelectorAll('.lap-mode-dragging').forEach(r => r.classList.remove('lap-mode-dragging'));
+
+                    if (!dragged) return; // right-click without drag — let context menu show normally
+
+                    // Suppress the context menu that fires after a right mouseup
+                    this._suppressNextContextMenu = true;
+
+                    const finalValue = sourceValue || this.state.sessions[sIdx].runs[rIdx].laps[startLap].mode;
+                    const lo = Math.min(startLap, endLap);
+                    const hi = Math.max(startLap, endLap);
+                    for (let i = lo; i <= hi; i++) {
+                        this.state.sessions[sIdx].runs[rIdx].laps[i].mode = finalValue;
+                    }
+                    this.render();
+                });
+
+                app.onkeydown = (e) => {
+                    const target = e.target;
+                    if (target.dataset.action !== 'changeLapType') return;
+
+                    const key = e.key;
+
+                    if (key === 'Enter') {
+                        e.preventDefault();
+                        // Store next focus target before dispatching (render will destroy DOM)
+                        const lapIdx = parseInt(target.dataset.lap);
+                        const sessionIdx = target.dataset.session;
+                        const runIdx = target.dataset.run;
+                        this.pendingFocus = `laptype-${sessionIdx}-${runIdx}-${lapIdx + 1}`;
+                        // Commit current selection — triggers onchange → render
+                        target.dispatchEvent(new Event('change', { bubbles: true }));
+                        return;
+                    }
+
+                    // Single-letter shortcut: map to preferred type and select it
+                    // without dispatching change (no re-render until Enter)
+                    const preferred = {
+                        p: 'push', c: 'cool', o: 'out', i: 'in',
+                        r: 'prep', u: 'push-in', t: 'out-in'
+                    };
+                    const mapped = preferred[key.toLowerCase()];
+                    if (mapped) {
+                        e.preventDefault();
+                        // Find the option and select it visually
+                        const option = Array.from(target.options).find(opt => opt.value === mapped);
+                        if (option) target.value = mapped;
+                    }
+                };
+
+                app.onchange = (e) => {
+                    const target = e.target;
+                    const action = target.dataset.action;
+
+                    if (!action) {
+                        // Handle specific IDs
+                        if (target.id === 'eventSelect') {
+                            this.state.selectedEventId = target.value;
+                            this.state.sessions = [];
+                            this.loadEvent(this.state.selectedEventId);
+                            this.render();
+                        } else if (target.id === 'engineerName') {
+                            this.state.engineer = target.value;
+                        } else if (target.id === 'emailTo') {
+                            this.state.emailTo = target.value;
+                        } else if (target.id === 'emailCC') {
+                            this.state.emailCC = target.value;
+                        } else if (target.id === 'issueNumber') {
+                            this.state.issueNumber = parseInt(target.value);
+                        }
+                        return;
+                    }
+
+                    const sessionIdx = parseInt(target.dataset.session);
+                    const runIdx = parseInt(target.dataset.run);
+                    const lapIdx = parseInt(target.dataset.lap);
+
+                    switch (action) {
+                        case 'toggleVisible':
+                            this.state.sessions[sessionIdx].visible = target.checked;
+                            this.render();
+                            break;
+                        case 'updateSessionName':
+                            this.state.sessions[sessionIdx].name = target.value;
+                            break;
+                        case 'updateSessionStart':
+                            this.state.sessions[sessionIdx].start = target.value;
+                            this.recalculateAllRunTimes(sessionIdx);
+                            this.render();
+                            break;
+                        case 'updateSessionEnd':
+                            this.state.sessions[sessionIdx].end = target.value;
+                            this.render();
+                            break;
+                        case 'updateSessionNotes':
+                            this.state.sessions[sessionIdx].notes = target.value;
+                            break;
+                        case 'changeTireSet':
+                            this.changeTireSet(sessionIdx, runIdx, target.value);
+                            break;
+                        case 'changeLapCount':
+                            this.updateLapCount(sessionIdx, runIdx, parseInt(target.value));
+                            break;
+                        case 'changeLapMode':
+                            this.state.sessions[sessionIdx].runs[runIdx].laps[lapIdx].mode = target.value;
+                            this.render();
+                            break;
+                        case 'changeLapType':
+                            this.updateLapType(sessionIdx, runIdx, lapIdx, target.value);
+                            break;
+                        case 'changeGarageTime':
+                            this.state.sessions[sessionIdx].runs[runIdx].garageTime = parseInt(target.value) || 0;
+                            this.recalculateRunTimes(sessionIdx, runIdx);
+                            this.render();
+                            break;
+                        case 'changeStartFuel':
+                            this.state.sessions[sessionIdx].runs[runIdx].startFuel = parseFloat(target.value) || 110;
+                            this.render();
+                            break;
+                        case 'updateNotes':
+                            this.state.sessions[sessionIdx].runs[runIdx].notes = target.value;
+                            break;
+                        case 'changeLapNotes':
+                            this.state.sessions[sessionIdx].runs[runIdx].laps[lapIdx].notes = target.value;
+                            break;
+                    }
+                };
+            }
+        }
+
+        // Initialize app when page loads
+        const app = new RunPlanApp();
+    </script>
+</body>
+</html>
