@@ -1892,22 +1892,57 @@
                         el.querySelectorAll('.add-run').forEach(b => b.style.visibility = 'hidden');
                     });
 
-                    // html2canvas doesn't reliably inherit CSS font sizes for inputs/selects —
-                    // stamp computed values as inline styles before capture, restore after
-                    const formEls = appEl.querySelectorAll('input, select, textarea');
-                    const savedStyles = Array.from(formEls).map(el => {
-                        const cs  = getComputedStyle(el);
-                        const prev = {
-                            fontSize:   el.style.fontSize,
-                            lineHeight: el.style.lineHeight,
-                            width:      el.style.width,
-                            overflow:   el.style.overflow
-                        };
-                        el.style.fontSize   = cs.fontSize;
-                        el.style.lineHeight = cs.lineHeight;
-                        el.style.width      = cs.width;
-                        el.style.overflow   = 'visible';
-                        return { el, prev };
+                    // html2canvas mis-renders input/select/textarea: wrong font size and
+                    // text not vertically centred. Replace each with an absolutely-positioned
+                    // <div> overlay that sits exactly on top of the hidden original.
+                    const overlays = [];
+                    appEl.querySelectorAll('input, select, textarea').forEach(el => {
+                        const cs   = getComputedStyle(el);
+                        const rect = el.getBoundingClientRect();
+                        const appRect = appEl.getBoundingClientRect();
+
+                        // Read display value (select shows selected option)
+                        let text = el.tagName === 'SELECT'
+                            ? (el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : '')
+                            : el.value;
+
+                        const isCenter = cs.textAlign === 'center' ||
+                                         el.style.textAlign === 'center' ||
+                                         el.getAttribute('style')?.includes('text-align: center') ||
+                                         el.getAttribute('style')?.includes('text-align:center');
+
+                        const div = document.createElement('div');
+                        div.style.cssText = [
+                            'position:absolute',
+                            `left:${rect.left - appRect.left}px`,
+                            `top:${rect.top  - appRect.top}px`,
+                            `width:${rect.width}px`,
+                            `height:${rect.height}px`,
+                            `font-size:${cs.fontSize}`,
+                            `font-family:${cs.fontFamily}`,
+                            `font-weight:${cs.fontWeight}`,
+                            `color:${cs.color}`,
+                            `background:${cs.backgroundColor}`,
+                            `border:${cs.border}`,
+                            `border-radius:${cs.borderRadius}`,
+                            `padding:${cs.paddingTop} ${cs.paddingRight} ${cs.paddingBottom} ${cs.paddingLeft}`,
+                            'box-sizing:border-box',
+                            'display:flex',
+                            'align-items:center',
+                            isCenter ? 'justify-content:center' : 'justify-content:flex-start',
+                            'overflow:hidden',
+                            'white-space:nowrap',
+                            'pointer-events:none',
+                            'z-index:9999',
+                        ].join(';');
+                        div.textContent = text;
+
+                        // Hide original but keep it in layout
+                        el.style.opacity = '0';
+
+                        appEl.style.position = 'relative';
+                        appEl.appendChild(div);
+                        overlays.push({ div, el });
                     });
 
                     const canvas = await window.html2canvas(appEl, {
@@ -1915,12 +1950,10 @@
                         backgroundColor: '#ffffff', logging: false
                     });
 
-                    // Restore inline styles
-                    savedStyles.forEach(({ el, prev }) => {
-                        el.style.fontSize   = prev.fontSize;
-                        el.style.lineHeight = prev.lineHeight;
-                        el.style.width      = prev.width;
-                        el.style.overflow   = prev.overflow;
+                    // Remove overlays and restore originals
+                    overlays.forEach(({ div, el }) => {
+                        div.remove();
+                        el.style.opacity = '';
                     });
 
                     // Restore visibility/display
