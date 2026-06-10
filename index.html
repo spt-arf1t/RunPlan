@@ -253,17 +253,11 @@
         .timeline-session-end {
             position: absolute;
             top: 0;
-            width: 3px;
+            width: 0;
             height: 100%;
             z-index: 10;
             pointer-events: none;
-            background-image: repeating-linear-gradient(
-                to bottom,
-                #000 0px,
-                #000 6px,
-                #fff 6px,
-                #fff 12px
-            );
+            border-left: 3px dashed #000;
         }
 
         .timeline-tick {
@@ -278,15 +272,9 @@
             position: absolute;
             top: 0;
             left: 0;
-            width: 1px;
+            width: 0;
             height: 100%;
-            background-image: repeating-linear-gradient(
-                to bottom,
-                #aaa 0px,
-                #aaa 4px,
-                transparent 4px,
-                transparent 10px
-            );
+            border-left: 1px dashed #aaa;
         }
 
         .timeline-tick-label {
@@ -720,9 +708,10 @@
         }
 
         .lap-table td {
-            padding: 2px 5px;
-            border-bottom: none;
+            padding: 0px 3px;
+            border: none;
             text-align: center;
+            line-height: 1.2;
         }
 
         .lap-table td.col-notes {
@@ -1729,7 +1718,7 @@
                                         <th style="white-space:nowrap;">Laps</th>
                                         <th style="white-space:nowrap;">Start Time</th>
                                         <th style="white-space:nowrap;">Duration</th>
-                                        <th colspan="3" style="white-space:nowrap;">Tire / Type / Mode</th>
+                                        <th colspan="2" style="white-space:nowrap;">Tire / Type / Mode</th>
                                         <th class="col-notes" style="text-align:left;">Description</th>
                                         <th style="white-space:nowrap;">Way Out</th>
                                         <th style="white-space:nowrap;">Way In</th>
@@ -1785,7 +1774,7 @@
                         </td>
                         <td style="white-space:nowrap; font-weight:600;">${runStartTime}</td>
                         <td style="white-space:nowrap; font-weight:600;">${duration}</td>
-                        <td colspan="3" style="white-space:nowrap;">${tireCell}</td>
+                        <td colspan="2" style="white-space:nowrap;">${tireCell}</td>
                         <td class="col-notes">
                             <textarea rows="1" class="notes-ta"
                                    style="width:100%;"
@@ -2037,14 +2026,16 @@
                                          el.getAttribute('style')?.includes('text-align: center') ||
                                          el.getAttribute('style')?.includes('text-align:center');
                         const isTextarea = el.tagName === 'TEXTAREA';
-                        // For multiline textareas use the actual scrollHeight so all lines show
-                        const overlayH = isTextarea ? el.scrollHeight : rect.height;
+                        // For textareas use the row height so the overlay covers the full expanded cell
+                        const rowRect = el.closest('tr') ? el.closest('tr').getBoundingClientRect() : null;
+                        const overlayH = isTextarea && rowRect ? rowRect.height : rect.height;
+                        const overlayTop = isTextarea && rowRect ? rowRect.top - appRect.top : rect.top - appRect.top;
 
                         const div = document.createElement('div');
                         div.style.cssText = [
                             'position:absolute',
                             `left:${rect.left - appRect.left}px`,
-                            `top:${rect.top  - appRect.top}px`,
+                            `top:${overlayTop}px`,
                             `width:${rect.width}px`,
                             `height:${overlayH}px`,
                             `font-size:${cs.fontSize}`,
