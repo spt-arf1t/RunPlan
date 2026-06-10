@@ -610,6 +610,11 @@
             padding: 2px 5px;
         }
 
+        .lap-row td:nth-child(1),
+        .lap-row td:nth-child(2) {
+            background: white !important;
+        }
+
         /* Lap Table */
         .lap-table-container {
             padding: 3px 6px;
@@ -1691,10 +1696,8 @@
                                         <th style="white-space:nowrap;">Laps</th>
                                         <th style="white-space:nowrap;">Start Time</th>
                                         <th style="white-space:nowrap;">Duration</th>
-                                        <th style="white-space:nowrap;">Tire</th>
-                                        <th class="col-laptype" style="white-space:nowrap;">Lap Type</th>
-                                        <th class="col-mode" style="white-space:nowrap;">Mode</th>
-                                        <th class="col-notes" style="text-align:left;">Notes</th>
+                                        <th colspan="2" style="white-space:nowrap;">Tire / Type / Mode</th>
+                                        <th class="col-notes" style="text-align:left;">Description</th>
                                         <th style="white-space:nowrap;">Fuel</th>
                                     </tr>
                                 </thead>
@@ -1720,14 +1723,15 @@
                 const sessionEnd = timeToHHMMSS(session.end);
                 const runStartTime = run.laps.length > 0 ? run.laps[0].startTime : '—';
                 const effectiveFuel = this.getEffectiveStartFuel(sessionIndex, runIndex);
-                const fuelDisplay = run.startFuel === 'NO REFUEL' ? 'No Refuel' : (run.startFuel ?? 30);
                 const tireCell = `<input type="text" value="${tireSet}" placeholder="501"
                     class="tire-input"
                     style="width:44px; text-align:center; --tire-bg:${tireInfo.color}; --tire-color:${tireInfo.role === 'Soft' ? '#fff' : '#000'};"
                     data-action="changeTireSet" data-session="${sessionIndex}" data-run="${runIndex}">
                     <span style="display:inline-block; padding:1px 4px; border-radius:3px; font-weight:700; font-size:11px;
                         background:${tireInfo.color}; color:${tireInfo.role === 'Soft' ? '#fff' : '#000'};">${compound}</span>
-                    <span style="font-size:10px; color:#555;">${run.tireAge > 0 ? `U${run.tireAge}` : 'New'}</span>`;
+                    <span style="font-size:11px; color:#555;">${run.tireAge > 0 ? `Used ${run.tireAge}L` : 'New'}</span>`;
+                const fuelVal = run.startFuel === 'NO REFUEL' ? 'No Refuel' : (run.startFuel ?? 30);
+                const fuelSuffix = run.startFuel !== 'NO REFUEL' ? ' <span style="font-size:10px;color:#555;">kg</span>' : '';
 
                 // Run header row
                 const headerRow = `
@@ -1737,8 +1741,7 @@
                             <input type="text" value="${secsToMmSs(run.garageTime || 0)}"
                                    style="width:50px; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700;"
                                    data-action="changeGarageTime" data-session="${sessionIndex}" data-run="${runIndex}"
-                                   data-garage-secs="${run.garageTime || 0}"
-                                   data-garage-input="1">
+                                   id="garage-${sessionIndex}-${runIndex}">
                         </td>
                         <td>
                             <input type="number" value="${run.laps.length}" min="1" max="50"
@@ -1747,18 +1750,16 @@
                         </td>
                         <td style="white-space:nowrap; font-weight:600;">${runStartTime}</td>
                         <td style="white-space:nowrap; font-weight:600;">${duration}</td>
-                        <td style="white-space:nowrap;">${tireCell}</td>
-                        <td></td>
-                        <td></td>
+                        <td style="white-space:nowrap;" colspan="2">${tireCell}</td>
                         <td class="col-notes">
                             <input type="text" value="${run.notes || ''}" placeholder=""
                                    style="width:100%; background:#B3AFAF; border-color:#999;"
                                    data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">
                         </td>
                         <td style="white-space:nowrap;">
-                            <input type="text" value="${fuelDisplay}"
-                                   style="width:60px; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700;"
-                                   data-action="changeStartFuel" data-session="${sessionIndex}" data-run="${runIndex}">
+                            <input type="text" value="${fuelVal}"
+                                   style="width:72px; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700; font-size:${run.startFuel === 'NO REFUEL' ? '10px' : '12px'};"
+                                   data-action="changeStartFuel" data-session="${sessionIndex}" data-run="${runIndex}">${fuelSuffix}
                         </td>
                     </tr>
                 `;
@@ -1778,13 +1779,14 @@
 
                     return `
                         <tr class="lap-row ${rowClass}" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
-                            <td></td>
-                            <td></td>
+                            <td style="background:white;"></td>
+                            <td style="background:white;"></td>
                             <td style="text-align:center;">${lap.lapNumber}</td>
                             <td class="${startOverTime ? 'time-warning' : ''}" style="white-space:nowrap;">${lap.startTime}</td>
                             <td style="white-space:nowrap;">${lap.lapTime}</td>
-                            <td></td>
-                            <td class="col-laptype">
+                            <td class="col-laptype" colspan="2"
+                                data-mode-cell="1" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
+                                <div style="display:flex; gap:3px; align-items:center;">
                                 <select data-action="changeLapType" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
                                         id="laptype-${sessionIndex}-${runIndex}-${lapIdx}"
                                         style="background:${this.lapTypeColor(lap.lapType)}; color:${this.lapTypeTextColor(lap.lapType)};">
@@ -1793,13 +1795,12 @@
                                             style="background:${this.lapTypeColor(type)}; color:${this.lapTypeTextColor(type)};">${type}</option>`
                                     ).join('')}
                                 </select>
-                            </td>
-                            <td class="col-mode" data-mode-cell="1" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
                                 <input type="text"
                                        value="${lapMode}"
                                        data-action="changeLapMode" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
-                                       style="width:60px; text-align:center; cursor:text;"
+                                       style="width:55px; text-align:center; cursor:text;"
                                        readonly>
+                                </div>
                             </td>
                             <td class="col-notes">
                                 <input type="text" value="${lap.notes || ''}" placeholder=""
@@ -2435,7 +2436,7 @@
                     const target = e.target;
 
                     // Garage time ArrowUp/Down: increment/decrement by 60 seconds
-                    if (target.dataset.action === 'changeGarageTime' && target.dataset.garageInput) {
+                    if (target.dataset.action === 'changeGarageTime') {
                         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                             e.preventDefault();
                             const sessionIdx = parseInt(target.dataset.session);
@@ -2443,9 +2444,8 @@
                             let secs = mmSsToSecs(target.value);
                             secs = e.key === 'ArrowUp' ? secs + 60 : Math.max(0, secs - 60);
                             this.state.sessions[sessionIdx].runs[runIdx].garageTime = secs;
-                            target.value = secsToMmSs(secs);
-                            target.dataset.garageSecs = secs;
                             this.recalculateRunTimes(sessionIdx, runIdx);
+                            this.pendingFocus = `garage-${sessionIdx}-${runIdx}`;
                             this.render();
                             return;
                         }
