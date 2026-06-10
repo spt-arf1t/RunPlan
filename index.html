@@ -1183,6 +1183,8 @@
                     garageTime: runNumber === 1 ? 0 : 300,
                     startFuel: 30,
                     notes: "",
+                    wayOut: "Practice Start",
+                    wayIn: "Static Pitstop",
                     laps: this.createDefaultLaps(defaultLaps, placeholderStart),
                     lapsCollapsed: false
                 };
@@ -1295,6 +1297,8 @@
                     garageTime: runIndex === 0 ? 0 : 300,
                     startFuel: 30,
                     notes: "",
+                    wayOut: "Practice Start",
+                    wayIn: "Static Pitstop",
                     laps: this.createDefaultLaps(5, placeholderStart),
                     lapsCollapsed: false
                 };
@@ -1725,9 +1729,10 @@
                                         <th style="white-space:nowrap;">Laps</th>
                                         <th style="white-space:nowrap;">Start Time</th>
                                         <th style="white-space:nowrap;">Duration</th>
-                                        <th class="col-laptype" style="white-space:nowrap;">Lap Type</th>
-                                        <th class="col-mode" style="white-space:nowrap;">Mode</th>
-                                        <th class="col-notes" style="text-align:left;">Tire / Description</th>
+                                        <th colspan="3" style="white-space:nowrap;">Tire / Type / Mode</th>
+                                        <th class="col-notes" style="text-align:left;">Description</th>
+                                        <th style="white-space:nowrap;">Way Out</th>
+                                        <th style="white-space:nowrap;">Way In</th>
                                         <th style="white-space:nowrap;">Fuel</th>
                                     </tr>
                                 </thead>
@@ -1780,15 +1785,21 @@
                         </td>
                         <td style="white-space:nowrap; font-weight:600;">${runStartTime}</td>
                         <td style="white-space:nowrap; font-weight:600;">${duration}</td>
-                        <td class="col-laptype"></td>
-                        <td class="col-mode"></td>
+                        <td colspan="3" style="white-space:nowrap;">${tireCell}</td>
                         <td class="col-notes">
-                            <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                                ${tireCell}
-                                <textarea rows="1" class="notes-ta"
-                                       style="flex:1; min-width:80px;"
-                                       data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">${run.notes || ''}</textarea>
-                            </div>
+                            <textarea rows="1" class="notes-ta"
+                                   style="width:100%;"
+                                   data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">${run.notes || ''}</textarea>
+                        </td>
+                        <td style="white-space:nowrap;">
+                            <textarea rows="1" class="notes-ta"
+                                   style="width:90px;"
+                                   data-action="updateWayOut" data-session="${sessionIndex}" data-run="${runIndex}">${run.wayOut ?? 'Practice Start'}</textarea>
+                        </td>
+                        <td style="white-space:nowrap;">
+                            <textarea rows="1" class="notes-ta"
+                                   style="width:90px;"
+                                   data-action="updateWayIn" data-session="${sessionIndex}" data-run="${runIndex}">${run.wayIn ?? 'Static Pitstop'}</textarea>
                         </td>
                         <td style="white-space:nowrap;">
                             <input type="text" value="${fuelVal}"
@@ -1835,7 +1846,7 @@
                                        style="width:55px; text-align:center; cursor:text;"
                                        readonly>
                             </td>
-                            <td class="col-notes">
+                            <td class="col-notes" colspan="3">
                                 <textarea rows="1" class="notes-ta"
                                        data-action="changeLapNotes" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
                                        id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}">${lap.notes || ''}</textarea>
@@ -2025,6 +2036,9 @@
                                          el.style.textAlign === 'center' ||
                                          el.getAttribute('style')?.includes('text-align: center') ||
                                          el.getAttribute('style')?.includes('text-align:center');
+                        const isTextarea = el.tagName === 'TEXTAREA';
+                        // For multiline textareas use the actual scrollHeight so all lines show
+                        const overlayH = isTextarea ? el.scrollHeight : rect.height;
 
                         const div = document.createElement('div');
                         div.style.cssText = [
@@ -2032,7 +2046,7 @@
                             `left:${rect.left - appRect.left}px`,
                             `top:${rect.top  - appRect.top}px`,
                             `width:${rect.width}px`,
-                            `height:${rect.height}px`,
+                            `height:${overlayH}px`,
                             `font-size:${cs.fontSize}`,
                             `font-family:${cs.fontFamily}`,
                             `font-weight:${cs.fontWeight}`,
@@ -2043,10 +2057,11 @@
                             `padding:${cs.paddingTop} ${cs.paddingRight} ${cs.paddingBottom} ${cs.paddingLeft}`,
                             'box-sizing:border-box',
                             'display:flex',
-                            'align-items:center',
+                            isTextarea ? 'align-items:flex-start' : 'align-items:center',
                             isCenter ? 'justify-content:center' : 'justify-content:flex-start',
                             'overflow:hidden',
-                            'white-space:nowrap',
+                            isTextarea ? 'white-space:pre-wrap' : 'white-space:nowrap',
+                            'word-break:break-word',
                             'pointer-events:none',
                             'z-index:9999',
                         ].join(';');
@@ -2617,6 +2632,12 @@
                         }
                         case 'updateNotes':
                             this.state.sessions[sessionIdx].runs[runIdx].notes = target.value;
+                            break;
+                        case 'updateWayOut':
+                            this.state.sessions[sessionIdx].runs[runIdx].wayOut = target.value;
+                            break;
+                        case 'updateWayIn':
+                            this.state.sessions[sessionIdx].runs[runIdx].wayIn = target.value;
                             break;
                         case 'changeLapNotes':
                             this.state.sessions[sessionIdx].runs[runIdx].laps[lapIdx].notes = target.value;
