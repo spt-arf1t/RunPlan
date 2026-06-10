@@ -1848,14 +1848,16 @@
                                    data-rich-content="${escapeAttr(run.notes)}"></div>
                         </td>
                         <td style="white-space:nowrap;">
-                            <textarea rows="1" class="notes-ta"
-                                   style="width:90px;"
-                                   data-action="updateWayOut" data-session="${sessionIndex}" data-run="${runIndex}">${run.wayOut ?? 'Practice Start'}</textarea>
+                            <div contenteditable="true" class="notes-ta rich-ta"
+                                   style="width:90px; min-width:90px; cursor:text;"
+                                   data-action="updateWayOut" data-session="${sessionIndex}" data-run="${runIndex}"
+                                   data-rich-content="${escapeAttr(run.wayOut ?? 'Practice Start')}"></div>
                         </td>
                         <td style="white-space:nowrap;">
-                            <textarea rows="1" class="notes-ta"
-                                   style="width:90px;"
-                                   data-action="updateWayIn" data-session="${sessionIndex}" data-run="${runIndex}">${run.wayIn ?? 'Static Pitstop'}</textarea>
+                            <div contenteditable="true" class="notes-ta rich-ta"
+                                   style="width:90px; min-width:90px; cursor:text;"
+                                   data-action="updateWayIn" data-session="${sessionIndex}" data-run="${runIndex}"
+                                   data-rich-content="${escapeAttr(run.wayIn ?? 'Static Pitstop')}"></div>
                         </td>
                     </tr>
                 `;
@@ -1875,9 +1877,9 @@
                     const lapTimeDisplay = lap.lapTime.replace(/\.\d+$/, '');
                     // First lap row gets the comment box spanning all lap rows (colspan 2 = WayOut+WayIn)
                     const commentCell = lapIdx === 0 && commentRowspan > 0
-                        ? `<td rowspan="${commentRowspan}" colspan="2" style="vertical-align:top; padding:2px 3px; background:white; border-left:1px solid #ddd;">
+                        ? `<td rowspan="${commentRowspan}" colspan="2" style="vertical-align:top; padding:2px 3px; background:white; border-left:1px solid #ddd; position:relative; z-index:5;">
                                <div contenteditable="true" class="notes-ta rich-ta comment-ta"
-                                      style="width:100%; min-height:30px; background:white; cursor:text;"
+                                      style="width:100%; min-height:30px; background:white; cursor:text; position:relative; z-index:5;"
                                       data-action="updateRunComment" data-session="${sessionIndex}" data-run="${runIndex}"
                                       data-rich-content="${escapeAttr(run.comment || 'Comments:')}"></div>
                            </td>`
@@ -1902,11 +1904,10 @@
                                 </select>
                             </td>
                             <td class="col-mode" data-mode-cell="1" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
-                                <input type="text"
-                                       value="${lapMode}"
+                                <div contenteditable="true" class="notes-ta rich-ta mode-rich-ta"
                                        data-action="changeLapMode" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
                                        style="width:55px; text-align:center; cursor:text;"
-                                       readonly>
+                                       data-rich-content="${escapeAttr(lapMode)}"></div>
                             </td>
                             <td class="col-notes">
                                 <div contenteditable="true" class="notes-ta rich-ta"
@@ -2090,29 +2091,31 @@
                     headerBtns.forEach(b => b.style.visibility = 'hidden');
 
                     const overlays = [];
-                    appEl.querySelectorAll('input, select, textarea').forEach(el => {
+                    appEl.querySelectorAll('input, select, textarea, div.rich-ta').forEach(el => {
                         const cs   = getComputedStyle(el);
                         const rect = el.getBoundingClientRect();
                         const appRect = appEl.getBoundingClientRect();
 
-                        // Read display value (select shows selected option)
+                        // Read display value
                         let text = el.tagName === 'SELECT'
                             ? (el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : '')
-                            : el.value;
+                            : el.tagName === 'DIV'
+                                ? (el.innerText || '')
+                                : el.value;
 
                         const isCenter = cs.textAlign === 'center' ||
                                          el.style.textAlign === 'center' ||
                                          el.getAttribute('style')?.includes('text-align: center') ||
                                          el.getAttribute('style')?.includes('text-align:center');
-                        const isTextarea = el.tagName === 'TEXTAREA';
+                        const isTextarea = el.tagName === 'TEXTAREA' || el.tagName === 'DIV';
                         const isComment  = el.classList.contains('comment-ta');
-                        // Single-line textareas in run headers (wayOut/wayIn) should centre vertically
+                        // Single-line fields in run headers should centre vertically
                         const isMultiline = isTextarea && el.scrollHeight > el.clientHeight * 1.5;
 
-                        // For textareas use the row height so the overlay covers the full expanded cell
-                        const rowRect = el.closest('tr') ? el.closest('tr').getBoundingClientRect() : null;
-                        const overlayH = isTextarea && rowRect ? rowRect.height : rect.height;
-                        const overlayTop = isTextarea && rowRect ? rowRect.top - appRect.top : rect.top - appRect.top;
+                        // For textareas/divs use the row height; comment box uses its own rect
+                        const rowRect = (!isComment && el.closest('tr')) ? el.closest('tr').getBoundingClientRect() : null;
+                        const overlayH = isComment ? rect.height : (isTextarea && rowRect ? rowRect.height : rect.height);
+                        const overlayTop = isComment ? rect.top - appRect.top : (isTextarea && rowRect ? rowRect.top - appRect.top : rect.top - appRect.top);
 
                         // Laps number input in run header: apply same left-shift as the live page
                         const isLapsInput = el.type === 'number' && el.dataset.action === 'changeLapCount';
@@ -2146,7 +2149,11 @@
                             'pointer-events:none',
                             'z-index:9999',
                         ].join(';');
-                        div.textContent = text;
+                        if (el.tagName === 'DIV') {
+                            div.innerHTML = el.innerHTML || '';
+                        } else {
+                            div.textContent = text;
+                        }
 
                         // Hide original but keep it in layout
                         el.style.opacity = '0';
@@ -2567,29 +2574,17 @@
                     const sIdx = parseInt(cell.dataset.session);
                     const rIdx = parseInt(cell.dataset.run);
                     const lIdx = parseInt(cell.dataset.lap);
-                    const input = cell.querySelector('input');
+                    // Mode field is now a contenteditable div
+                    const modeDiv = cell.querySelector('div.mode-rich-ta');
 
                     if (e.button === 2) {
                         // Right mouse button — start drag-paint
                         e.preventDefault();
                         this.dragMode = { sIdx, rIdx, startLap: lIdx, endLap: lIdx, dragged: false, isRightDrag: true };
-                        if (input) this.dragMode.sourceValue = input.value.trim();
+                        if (modeDiv) this.dragMode.sourceValue = modeDiv.innerText.trim();
                         return;
                     }
-
-                    // Left click on the mode input — make editable and select all text
-                    if (input) {
-                        input.removeAttribute('readonly');
-                        input.focus();
-                        // setTimeout so the selection survives the mouseup that follows mousedown
-                        setTimeout(() => input.select(), 0);
-
-                        input.onblur = () => {
-                            const val = input.value.trim();
-                            if (val) this.state.sessions[sIdx].runs[rIdx].laps[lIdx].mode = val;
-                            this.render();
-                        };
-                    }
+                    // Left click — contenteditable div handles focus/editing natively, nothing to do
                 };
 
                 app.onmouseover = (e) => {
@@ -2640,6 +2635,7 @@
                         this.state.sessions[sIdx].runs[rIdx].laps[i].mode = finalValue;
                     }
                     this.render();
+                    return;
                 });
 
                 // Auto-expand textareas/contenteditable divs without causing layout jump.
@@ -2671,8 +2667,14 @@
                             this.state.sessions[sIdx].notes = target.innerHTML; break;
                         case 'updateNotes':
                             this.state.sessions[sIdx].runs[rIdx].notes = target.innerHTML; break;
+                        case 'changeLapMode':
+                            this.state.sessions[sIdx].runs[rIdx].laps[lIdx].mode = target.innerText.trim() || target.innerHTML; break;
                         case 'changeLapNotes':
                             this.state.sessions[sIdx].runs[rIdx].laps[lIdx].notes = target.innerHTML; break;
+                        case 'updateWayOut':
+                            this.state.sessions[sIdx].runs[rIdx].wayOut = target.innerHTML; break;
+                        case 'updateWayIn':
+                            this.state.sessions[sIdx].runs[rIdx].wayIn = target.innerHTML; break;
                         case 'updateRunComment':
                             this.state.sessions[sIdx].runs[rIdx].comment = target.innerHTML; break;
                     }
@@ -2843,10 +2845,10 @@
                             // Handled by rich-ta input listener
                             break;
                         case 'updateWayOut':
-                            this.state.sessions[sessionIdx].runs[runIdx].wayOut = target.value;
+                            // Handled by rich-ta input listener
                             break;
                         case 'updateWayIn':
-                            this.state.sessions[sessionIdx].runs[runIdx].wayIn = target.value;
+                            // Handled by rich-ta input listener
                             break;
                         case 'updateRunComment':
                             // Handled by rich-ta input listener
