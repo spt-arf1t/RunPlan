@@ -588,8 +588,9 @@
         .run-header-row td {
             font-weight: 700;
             color: #222;
-            padding: 3px 5px;
+            padding: 2px 3px;
             border-bottom: 1px solid #999;
+            vertical-align: middle;
         }
 
         .run-header-row input,
@@ -607,12 +608,40 @@
         }
 
         .lap-row td {
-            padding: 2px 5px;
+            padding: 0px 3px;
+            vertical-align: middle;
         }
 
         .lap-row td:nth-child(1),
         .lap-row td:nth-child(2) {
             background: white !important;
+        }
+
+        .notes-ta {
+            width: 100%;
+            resize: none;
+            overflow: hidden;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: inherit;
+            padding: 1px 4px;
+            line-height: 1.4;
+            background: transparent;
+            box-sizing: border-box;
+            display: block;
+        }
+
+        .run-header-row .notes-ta {
+            background: #B3AFAF;
+            border-color: #999;
+        }
+
+        .session-header .notes-ta {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 12px;
         }
 
         /* Lap Table */
@@ -716,7 +745,7 @@
         .lap-table input,
         .lap-table select {
             width: 100%;
-            padding: 2px 4px;
+            padding: 0px 3px;
             border: 1px solid #ddd;
             border-radius: 3px;
             font-size: 12px;
@@ -1679,10 +1708,10 @@
                             <div class="session-summary" onclick="event.stopPropagation()">
                                 <span class="session-summary-item" style="flex-grow:1;">
                                     <span class="session-summary-label">Notes:</span>
-                                    <input type="text" value="${session.notes || ''}" placeholder="—"
+                                    <textarea rows="1" class="notes-ta"
                                            data-action="updateSessionNotes" data-session="${sessionIndex}"
                                            onclick="event.stopPropagation()"
-                                           style="background:transparent; border:none; color:white; font-size:12px; flex-grow:1; width:100%; padding:0 2px;">
+                                           style="color:white; flex-grow:1; width:100%;">${session.notes || ''}</textarea>
                                 </span>
                             </div>
                         </div>
@@ -1756,9 +1785,9 @@
                         <td class="col-notes">
                             <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
                                 ${tireCell}
-                                <input type="text" value="${run.notes || ''}" placeholder=""
-                                       style="flex:1; min-width:80px; background:#B3AFAF; border-color:#999;"
-                                       data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">
+                                <textarea rows="1" class="notes-ta"
+                                       style="flex:1; min-width:80px;"
+                                       data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">${run.notes || ''}</textarea>
                             </div>
                         </td>
                         <td style="white-space:nowrap;">
@@ -1786,7 +1815,7 @@
                         <tr class="lap-row ${rowClass}" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
                             <td style="background:white;"></td>
                             <td style="background:white;"></td>
-                            <td style="text-align:center;">${lap.lapNumber}</td>
+                            <td style="text-align:right; padding-right:18px;">${lap.lapNumber}</td>
                             <td class="${startOverTime ? 'time-warning' : ''}" style="white-space:nowrap;">${lap.startTime}</td>
                             <td style="white-space:nowrap;">${lap.lapTime}</td>
                             <td class="col-laptype">
@@ -1807,10 +1836,9 @@
                                        readonly>
                             </td>
                             <td class="col-notes">
-                                <input type="text" value="${lap.notes || ''}" placeholder=""
+                                <textarea rows="1" class="notes-ta"
                                        data-action="changeLapNotes" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
-                                       id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}"
-                                       style="width:100%;">
+                                       id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}">${lap.notes || ''}</textarea>
                             </td>
                             <td class="${parseFloat(fuelAtEnd) <= 0 ? 'fuel-warning' : ''}" style="text-align:center;">${fuelAtEnd}</td>
                         </tr>
@@ -2436,8 +2464,32 @@
                     this.render();
                 });
 
+                // Auto-expand textareas as content grows
+                const autoExpand = (ta) => {
+                    ta.style.height = 'auto';
+                    ta.style.height = ta.scrollHeight + 'px';
+                };
+                app.addEventListener('input', (e) => {
+                    if (e.target.tagName === 'TEXTAREA') autoExpand(e.target);
+                });
+                // Expand all textareas on initial render
+                setTimeout(() => {
+                    document.querySelectorAll('textarea.notes-ta').forEach(autoExpand);
+                }, 0);
+
                 app.onkeydown = (e) => {
                     const target = e.target;
+
+                    // Alt+Enter in any notes textarea: insert a newline
+                    if (e.altKey && e.key === 'Enter' && target.tagName === 'TEXTAREA') {
+                        e.preventDefault();
+                        const pos = target.selectionStart;
+                        const val = target.value;
+                        target.value = val.slice(0, pos) + '\n' + val.slice(target.selectionEnd);
+                        target.selectionStart = target.selectionEnd = pos + 1;
+                        autoExpand(target);
+                        return;
+                    }
 
                     // Garage time ArrowUp/Down: increment/decrement by 60 seconds
                     if (target.dataset.action === 'changeGarageTime') {
