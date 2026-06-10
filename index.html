@@ -575,6 +575,41 @@
             max-width: 150px;
         }
 
+        /* Session Table (unified per-session table with run-header + lap rows) */
+        .session-table {
+            margin: 4px 6px 4px 6px;
+            width: calc(100% - 12px);
+        }
+
+        .run-header-row {
+            background: #B3AFAF;
+        }
+
+        .run-header-row td {
+            font-weight: 700;
+            color: #222;
+            padding: 3px 5px;
+            border-bottom: 1px solid #999;
+        }
+
+        .run-header-row input,
+        .run-header-row select {
+            color: #111 !important;
+            font-weight: 700 !important;
+            background: #B3AFAF !important;
+            border-color: #999 !important;
+        }
+
+        .run-header-row input.tire-input {
+            background-color: var(--tire-bg) !important;
+            color: var(--tire-color) !important;
+            border-color: var(--tire-bg) !important;
+        }
+
+        .lap-row td {
+            padding: 2px 5px;
+        }
+
         /* Lap Table */
         .lap-table-container {
             padding: 3px 6px;
@@ -667,6 +702,10 @@
 
         .lap-table tr:hover {
             background: #f8f9fa;
+        }
+
+        .lap-table tr.run-header-row:hover {
+            background: #cdc9c9;
         }
 
         .lap-table input,
@@ -887,6 +926,35 @@
             return `${m}:${s.padStart(4, '0')}`;
         }
 
+        // Convert integer seconds to "mm:ss" display string
+        function secsToMmSs(secs) {
+            const s = Math.max(0, Math.floor(secs));
+            const mm = Math.floor(s / 60);
+            const ss = s % 60;
+            return `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+        }
+
+        // Parse "mm:ss" (or "mm") string to integer seconds; returns 0 on failure
+        function mmSsToSecs(str) {
+            if (!str) return 0;
+            str = str.trim();
+            if (str.includes(':')) {
+                const parts = str.split(':');
+                const mm = parseInt(parts[0]) || 0;
+                const ss = parseInt(parts[1]) || 0;
+                return mm * 60 + ss;
+            }
+            return (parseInt(str) || 0) * 60;
+        }
+
+        // Convert garage seconds to a lap-time-style string "M:SS.0" for addTimeToSessionTime
+        function secsToLapTimeStr(secs) {
+            const s = Math.max(0, Math.floor(secs));
+            const m = Math.floor(s / 60);
+            const ss = s % 60;
+            return `${m}:${String(ss).padStart(2,'0')}.0`;
+        }
+
         // Build lapTypes from a push lap time string e.g. "1:19.0"
         // Offsets in seconds: out+27, cool+13, prep+17, in+21, push-in+7, out-in+42
         function makeLapTypes(pushTime) {
@@ -1078,7 +1146,7 @@
                     runNumber: runNumber,
                     tireSet: defaultTireSet,
                     tireAge: tireAge,
-                    garageTime: runNumber === 1 ? 0 : 5,
+                    garageTime: runNumber === 1 ? 0 : 300,
                     startFuel: 30,
                     notes: "",
                     laps: this.createDefaultLaps(defaultLaps, placeholderStart),
@@ -1190,7 +1258,7 @@
                     runNumber: runIndex + 1,
                     tireSet: defaultTireSet,
                     tireAge: 0,
-                    garageTime: runIndex === 0 ? 0 : 5,
+                    garageTime: runIndex === 0 ? 0 : 300,
                     startFuel: 30,
                     notes: "",
                     laps: this.createDefaultLaps(5, placeholderStart),
@@ -1260,13 +1328,13 @@
 
                 let startTime;
                 if (runIndex === 0) {
-                    const garageMinutes = run.garageTime || 0;
-                    startTime = addTimeToSessionTime(timeToHHMMSS(session.start), `${garageMinutes}:00.0`);
+                    const garageSecs = run.garageTime || 0;
+                    startTime = addTimeToSessionTime(timeToHHMMSS(session.start), secsToLapTimeStr(garageSecs));
                 } else {
                     const prevRun = session.runs[runIndex - 1];
                     const prevEnd = this.calculateRunEnd(prevRun);
-                    const garageMinutes = run.garageTime || 0;
-                    startTime = addTimeToSessionTime(prevEnd, `${garageMinutes}:00.0`);
+                    const garageSecs = run.garageTime || 0;
+                    startTime = addTimeToSessionTime(prevEnd, secsToLapTimeStr(garageSecs));
                 }
 
                 let currentTime = startTime;
@@ -1290,6 +1358,20 @@
                     return sum + timeStringToMinutes(lap.lapTime);
                 }, 0);
                 return minutesToTimeString(totalSeconds);
+            }
+
+            getEffectiveStartFuel(sessionIndex, runIndex) {
+                const run = this.state.sessions[sessionIndex].runs[runIndex];
+                if (run.startFuel !== 'NO REFUEL') return run.startFuel ?? 30;
+                // Scan backwards for the previous run's last-lap end fuel
+                const fc = this.currentEvent.fuelConsumption;
+                for (let ri = runIndex - 1; ri >= 0; ri--) {
+                    const prevRun = this.state.sessions[sessionIndex].runs[ri];
+                    const prevFuel = this.getEffectiveStartFuel(sessionIndex, ri);
+                    return prevFuel - prevRun.laps.length * fc;
+                }
+                // No previous run in this session — try across sessions? Just return 0.
+                return 0;
             }
 
             updateTireUsage() {
@@ -1395,6 +1477,7 @@
                     <div id="run-context-menu" style="display:none; position:fixed; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2); z-index:9999; min-width:150px;">
                         <div id="ctx-add-run-above" style="padding:8px 14px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">+ Add run above</div>
                         <div id="ctx-toggle-laps" style="padding:8px 14px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">Collapse laps</div>
+                        <div id="ctx-no-refuel" style="padding:8px 14px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">No Refuel</div>
                         <div style="height:1px; background:#eee; margin:0 8px;"></div>
                         <div id="ctx-delete-run" style="padding:8px 14px; cursor:pointer; font-size:13px; color:#c00;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">✕ Delete run</div>
                     </div>
@@ -1529,7 +1612,7 @@
                             <div class="timeline-run"
                                  style="left: ${leftPercent.toFixed(3)}%; width: ${widthPercent.toFixed(3)}%;"
                                  title="Run ${run.runNumber}: ${run.laps.length} laps on ${tireSet} (${tireInfo.displayName})">
-                                <div class="timeline-run-header" style="background:${headerBg}; color:${tireInfo.role === 'Soft' ? '#fff' : '#000'};">R${run.runNumber} &middot; ${run.tireAge > 0 ? 'Used' : 'New'} ${compound} (${tireSet}) &middot; ${run.startFuel ?? 30} kg</div>
+                                <div class="timeline-run-header" style="background:${headerBg}; color:${tireInfo.role === 'Soft' ? '#fff' : '#000'};">R${run.runNumber} &middot; ${run.tireAge > 0 ? 'Used' : 'New'} ${compound} (${tireSet}) &middot; ${run.startFuel === 'NO REFUEL' ? 'No Refuel' : (run.startFuel ?? 30) + ' kg'}</div>
                                 <div class="timeline-run-laps">${lapSegs}</div>
                             </div>
                         `;
@@ -1599,12 +1682,27 @@
                             </div>
                         </div>
                         <div class="session-content ${session.collapsed ? 'collapsed' : ''}">
-                            <div class="runs">
-                                ${session.runs.length > 0
-                                    ? session.runs.map((run, idx) => this.renderRun(run, sessionIndex, idx)).join('')
-                                    : '<div class="no-runs">No runs planned yet</div>'
-                                }
-                            </div>
+                            ${session.runs.length > 0 ? `
+                            <table class="session-table lap-table">
+                                <thead>
+                                    <tr>
+                                        <th style="white-space:nowrap;">Run</th>
+                                        <th style="white-space:nowrap;">Garage</th>
+                                        <th style="white-space:nowrap;">Laps</th>
+                                        <th style="white-space:nowrap;">Start Time</th>
+                                        <th style="white-space:nowrap;">Duration</th>
+                                        <th style="white-space:nowrap;">Tire</th>
+                                        <th class="col-laptype" style="white-space:nowrap;">Lap Type</th>
+                                        <th class="col-mode" style="white-space:nowrap;">Mode</th>
+                                        <th class="col-notes" style="text-align:left;">Notes</th>
+                                        <th style="white-space:nowrap;">Fuel</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${session.runs.map((run, idx) => this.renderRunRows(run, sessionIndex, idx)).join('')}
+                                </tbody>
+                            </table>
+                            ` : '<div class="no-runs">No runs planned yet</div>'}
                             <div class="add-run">
                                 <button class="btn-add" data-action="addRun" data-session="${sessionIndex}">+ Add Run</button>
                             </div>
@@ -1613,124 +1711,108 @@
                 `;
             }
 
-            renderRun(run, sessionIndex, runIndex) {
+            renderRunRows(run, sessionIndex, runIndex) {
                 const session = this.state.sessions[sessionIndex];
                 const tireSet = run.tireSet || "501";
                 const compound = this.getTireCompoundFromSet(tireSet);
                 const tireInfo = getTireInfo(compound, this.currentEvent.tireCompounds);
                 const duration = this.calculateRunDuration(run);
-                const endTime = this.calculateRunEnd(run);
                 const sessionEnd = timeToHHMMSS(session.end);
-                const exceedsTime = isTimeAfter(endTime, sessionEnd);
+                const runStartTime = run.laps.length > 0 ? run.laps[0].startTime : '—';
+                const effectiveFuel = this.getEffectiveStartFuel(sessionIndex, runIndex);
+                const fuelDisplay = run.startFuel === 'NO REFUEL' ? 'No Refuel' : (run.startFuel ?? 30);
+                const tireCell = `<input type="text" value="${tireSet}" placeholder="501"
+                    class="tire-input"
+                    style="width:44px; text-align:center; --tire-bg:${tireInfo.color}; --tire-color:${tireInfo.role === 'Soft' ? '#fff' : '#000'};"
+                    data-action="changeTireSet" data-session="${sessionIndex}" data-run="${runIndex}">
+                    <span style="display:inline-block; padding:1px 4px; border-radius:3px; font-weight:700; font-size:11px;
+                        background:${tireInfo.color}; color:${tireInfo.role === 'Soft' ? '#fff' : '#000'};">${compound}</span>
+                    <span style="font-size:10px; color:#555;">${run.tireAge > 0 ? `U${run.tireAge}` : 'New'}</span>`;
 
-                const totalDistance = (run.laps.length * this.currentEvent.lapLength).toFixed(1);
-
-                return `
-                    <div class="run-card">
-                        <div class="run-header" data-session="${sessionIndex}" data-run="${runIndex}">
-                            <span class="run-title">Run ${run.runNumber}</span>
-                            <div class="form-group">
-                                <label>Garage Time:</label>
-                                <input type="number" value="${run.garageTime || 0}" min="0" max="60" step="1"
-                                       style="width: 50px; text-align: center;"
-                                       data-action="changeGarageTime" data-session="${sessionIndex}" data-run="${runIndex}">
-                                <span class="run-header-unit">min</span>
-                            </div>
-                            <div class="form-group">
-                                <label>Tire:</label>
-                                <input type="text" value="${tireSet}" placeholder="501"
-                                       class="tire-input"
-                                       style="width: 50px; text-align: center; --tire-bg: ${tireInfo.color}; --tire-color: ${tireInfo.role === 'Soft' ? '#fff' : '#000'};"
-                                       data-action="changeTireSet" data-session="${sessionIndex}" data-run="${runIndex}">
-                                <div class="tire-indicator" style="background-color: ${tireInfo.color}; color: ${tireInfo.role === 'Soft' ? '#fff' : '#000'}; font-weight: 700;">${compound}</div>
-                                <span class="tire-age">${run.tireAge > 0 ? `Used ${run.tireAge}L` : 'New'}</span>
-                            </div>
-                            <div class="form-group">
-                                <label>Laps:</label>
-                                <input type="number" value="${run.laps.length}" min="1" max="50"
-                                       style="width: 50px; text-align: center;"
-                                       data-action="changeLapCount" data-session="${sessionIndex}" data-run="${runIndex}">
-                            </div>
-                            <div class="form-group">
-                                <label>Fuel:</label>
-                                <input type="text" value="${run.startFuel ?? 30}"
-                                       style="width: 50px; text-align: center;"
-                                       data-action="changeStartFuel" data-session="${sessionIndex}" data-run="${runIndex}">
-                                <span class="run-header-unit">kg</span>
-                            </div>
-                            <div class="form-group" style="flex-grow: 1;">
-                                <label>Notes:</label>
-                                <input type="text" value="${run.notes || ''}" placeholder=""
-                                       style="flex-grow: 1; min-width: 150px;"
-                                       data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">
-                            </div>
-                        </div>
-                        ${!run.lapsCollapsed ? `
-                            <div class="lap-table-container">
-                                <table class="lap-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Lap</th>
-                                            <th class="col-laptype">Lap Type</th>
-                                            <th class="col-mode">Mode</th>
-                                            <th class="col-notes">Notes</th>
-                                            <th>Start Time</th>
-                                            <th>Est. LapTime</th>
-                                            <th>End Fuel</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${run.laps.map((lap, lapIdx) => {
-                                            const lapEnd = addTimeToSessionTime(lap.startTime, lap.lapTime);
-                                            const fuelAtEnd = ((run.startFuel ?? 30) - (lapIdx + 1) * this.currentEvent.fuelConsumption).toFixed(1);
-                                            const lapMode = lap.mode || this.getModeFromLapType(lap.lapType);
-                                            const startOverTime = isTimeAfter(lap.startTime, sessionEnd);
-                                            const greyTypes = ['out', 'in', 'out-in'];
-                                            const rowClass = lap.lapType === 'cool'    ? 'lap-row-blue'
-                                                : lap.lapType === 'push-in' ? 'lap-row-green-soft'
-                                                : lap.lapType === 'prep'    ? 'lap-row-orange'
-                                                : greyTypes.includes(lap.lapType) ? 'lap-row-grey' : '';
-                                            // Ordered so push comes before prep
-                                            const typeOrder = ['push', 'cool', 'out', 'in', 'prep', 'push-in', 'out-in'];
-
-                                            return `
-                                                <tr class="${rowClass}" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
-                                                    <td>${lap.lapNumber}</td>
-                                                    <td class="col-laptype">
-                                                        <select data-action="changeLapType" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
-                                                                id="laptype-${sessionIndex}-${runIndex}-${lapIdx}"
-                                                                style="background:${this.lapTypeColor(lap.lapType)}; color:${this.lapTypeTextColor(lap.lapType)};">
-                                                            ${typeOrder.map(type =>
-                                                                `<option value="${type}" ${type === lap.lapType ? 'selected' : ''}
-                                                                    style="background:${this.lapTypeColor(type)}; color:${this.lapTypeTextColor(type)};">${type}</option>`
-                                                            ).join('')}
-                                                        </select>
-                                                    </td>
-                                                    <td class="col-mode" data-mode-cell="1" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
-                                                        <input type="text"
-                                                               value="${lapMode}"
-                                                               data-action="changeLapMode" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
-                                                               style="width:60px; text-align:center; cursor:text;"
-                                                               readonly>
-                                                    </td>
-                                                    <td class="col-notes">
-                                                        <input type="text" value="${lap.notes || ''}" placeholder=""
-                                                               data-action="changeLapNotes" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
-                                                               id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}"
-                                                               style="width: 100%;">
-                                                    </td>
-                                                    <td class="${startOverTime ? 'time-warning' : ''}">${lap.startTime}</td>
-                                                    <td>${lap.lapTime}</td>
-                                                    <td class="${parseFloat(fuelAtEnd) <= 0 ? 'fuel-warning' : ''}">${fuelAtEnd}</td>
-                                                </tr>
-                                            `;
-                                        }).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ` : ''}
-                    </div>
+                // Run header row
+                const headerRow = `
+                    <tr class="run-header-row" data-session="${sessionIndex}" data-run="${runIndex}">
+                        <td style="font-weight:700; font-size:13px; color:#222; white-space:nowrap;">${run.runNumber}</td>
+                        <td style="white-space:nowrap;">
+                            <input type="text" value="${secsToMmSs(run.garageTime || 0)}"
+                                   style="width:50px; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700;"
+                                   data-action="changeGarageTime" data-session="${sessionIndex}" data-run="${runIndex}"
+                                   data-garage-secs="${run.garageTime || 0}"
+                                   data-garage-input="1">
+                        </td>
+                        <td>
+                            <input type="number" value="${run.laps.length}" min="1" max="50"
+                                   style="width:45px; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700;"
+                                   data-action="changeLapCount" data-session="${sessionIndex}" data-run="${runIndex}">
+                        </td>
+                        <td style="white-space:nowrap; font-weight:600;">${runStartTime}</td>
+                        <td style="white-space:nowrap; font-weight:600;">${duration}</td>
+                        <td style="white-space:nowrap;">${tireCell}</td>
+                        <td></td>
+                        <td></td>
+                        <td class="col-notes">
+                            <input type="text" value="${run.notes || ''}" placeholder=""
+                                   style="width:100%; background:#B3AFAF; border-color:#999;"
+                                   data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">
+                        </td>
+                        <td style="white-space:nowrap;">
+                            <input type="text" value="${fuelDisplay}"
+                                   style="width:60px; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700;"
+                                   data-action="changeStartFuel" data-session="${sessionIndex}" data-run="${runIndex}">
+                        </td>
+                    </tr>
                 `;
+
+                if (run.lapsCollapsed) return headerRow;
+
+                const typeOrder = ['push', 'cool', 'out', 'in', 'prep', 'push-in', 'out-in'];
+                const lapRows = run.laps.map((lap, lapIdx) => {
+                    const fuelAtEnd = (effectiveFuel - (lapIdx + 1) * this.currentEvent.fuelConsumption).toFixed(1);
+                    const lapMode = lap.mode || this.getModeFromLapType(lap.lapType);
+                    const startOverTime = isTimeAfter(lap.startTime, sessionEnd);
+                    const greyTypes = ['out', 'in', 'out-in'];
+                    const rowClass = lap.lapType === 'cool'    ? 'lap-row-blue'
+                        : lap.lapType === 'push-in' ? 'lap-row-green-soft'
+                        : lap.lapType === 'prep'    ? 'lap-row-orange'
+                        : greyTypes.includes(lap.lapType) ? 'lap-row-grey' : '';
+
+                    return `
+                        <tr class="lap-row ${rowClass}" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
+                            <td></td>
+                            <td></td>
+                            <td style="text-align:center;">${lap.lapNumber}</td>
+                            <td class="${startOverTime ? 'time-warning' : ''}" style="white-space:nowrap;">${lap.startTime}</td>
+                            <td style="white-space:nowrap;">${lap.lapTime}</td>
+                            <td></td>
+                            <td class="col-laptype">
+                                <select data-action="changeLapType" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
+                                        id="laptype-${sessionIndex}-${runIndex}-${lapIdx}"
+                                        style="background:${this.lapTypeColor(lap.lapType)}; color:${this.lapTypeTextColor(lap.lapType)};">
+                                    ${typeOrder.map(type =>
+                                        `<option value="${type}" ${type === lap.lapType ? 'selected' : ''}
+                                            style="background:${this.lapTypeColor(type)}; color:${this.lapTypeTextColor(type)};">${type}</option>`
+                                    ).join('')}
+                                </select>
+                            </td>
+                            <td class="col-mode" data-mode-cell="1" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
+                                <input type="text"
+                                       value="${lapMode}"
+                                       data-action="changeLapMode" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
+                                       style="width:60px; text-align:center; cursor:text;"
+                                       readonly>
+                            </td>
+                            <td class="col-notes">
+                                <input type="text" value="${lap.notes || ''}" placeholder=""
+                                       data-action="changeLapNotes" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
+                                       id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}"
+                                       style="width:100%;">
+                            </td>
+                            <td class="${parseFloat(fuelAtEnd) <= 0 ? 'fuel-warning' : ''}" style="text-align:center;">${fuelAtEnd}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return headerRow + lapRows;
             }
 
             renderFooter() {
@@ -2017,7 +2099,7 @@
 
                     // Session header right-click (must check before run-header since it's a parent)
                     const sessionHeader = e.target.closest('.session-header[data-session]');
-                    const runHeader = e.target.closest('.run-header[data-run]');
+                    const runHeader = e.target.closest('tr.run-header-row[data-run]');
                     if (sessionHeader && !runHeader) {
                         e.preventDefault();
                         const menu = document.getElementById('session-context-menu');
@@ -2041,6 +2123,8 @@
                         menu.dataset.session = sIdx;
                         menu.dataset.run     = rIdx;
                         document.getElementById('ctx-toggle-laps').textContent = isCollapsed ? 'Expand laps' : 'Collapse laps';
+                        const isNoRefuel = this.state.sessions[sIdx].runs[rIdx].startFuel === 'NO REFUEL';
+                        document.getElementById('ctx-no-refuel').textContent = isNoRefuel ? 'Set Fuel (restore)' : 'No Refuel';
                         return;
                     }
 
@@ -2136,6 +2220,20 @@
                         const menu = document.getElementById('run-context-menu');
                         menu.style.display = 'none';
                         this.deleteRun(parseInt(menu.dataset.session), parseInt(menu.dataset.run));
+                    };
+                }
+
+                const ctxNoRefuel = document.getElementById('ctx-no-refuel');
+                if (ctxNoRefuel) {
+                    ctxNoRefuel.onclick = (e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById('run-context-menu');
+                        menu.style.display = 'none';
+                        const sIdx = parseInt(menu.dataset.session);
+                        const rIdx = parseInt(menu.dataset.run);
+                        const run = this.state.sessions[sIdx].runs[rIdx];
+                        run.startFuel = run.startFuel === 'NO REFUEL' ? 30 : 'NO REFUEL';
+                        this.render();
                     };
                 }
 
@@ -2335,6 +2433,24 @@
 
                 app.onkeydown = (e) => {
                     const target = e.target;
+
+                    // Garage time ArrowUp/Down: increment/decrement by 60 seconds
+                    if (target.dataset.action === 'changeGarageTime' && target.dataset.garageInput) {
+                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const sessionIdx = parseInt(target.dataset.session);
+                            const runIdx = parseInt(target.dataset.run);
+                            let secs = mmSsToSecs(target.value);
+                            secs = e.key === 'ArrowUp' ? secs + 60 : Math.max(0, secs - 60);
+                            this.state.sessions[sessionIdx].runs[runIdx].garageTime = secs;
+                            target.value = secsToMmSs(secs);
+                            target.dataset.garageSecs = secs;
+                            this.recalculateRunTimes(sessionIdx, runIdx);
+                            this.render();
+                            return;
+                        }
+                    }
+
                     if (target.dataset.action !== 'changeLapType') return;
 
                     const key = e.key;
@@ -2426,15 +2542,23 @@
                         case 'changeLapType':
                             this.updateLapType(sessionIdx, runIdx, lapIdx, target.value);
                             break;
-                        case 'changeGarageTime':
-                            this.state.sessions[sessionIdx].runs[runIdx].garageTime = parseInt(target.value) || 0;
+                        case 'changeGarageTime': {
+                            const secs = mmSsToSecs(target.value);
+                            this.state.sessions[sessionIdx].runs[runIdx].garageTime = secs;
                             this.recalculateRunTimes(sessionIdx, runIdx);
                             this.render();
                             break;
-                        case 'changeStartFuel':
-                            this.state.sessions[sessionIdx].runs[runIdx].startFuel = parseFloat(target.value) || 110;
-                            this.render();
+                        }
+                        case 'changeStartFuel': {
+                            const fv = target.value.trim();
+                            const num = parseFloat(fv);
+                            if (!isNaN(num)) {
+                                this.state.sessions[sessionIdx].runs[runIdx].startFuel = num;
+                                this.render();
+                            }
+                            // If it's "No Refuel" text typed directly, ignore (use context menu)
                             break;
+                        }
                         case 'updateNotes':
                             this.state.sessions[sessionIdx].runs[runIdx].notes = target.value;
                             break;
