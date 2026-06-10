@@ -60,8 +60,8 @@
             background: transparent;
             border: none;
             color: white;
-            font-size: 24px;
-            font-weight: 800;
+            font-size: 22px;
+            font-weight: 700;
             cursor: pointer;
             padding: 0;
             outline: none;
@@ -252,9 +252,9 @@
 
         .timeline-session-end {
             position: absolute;
-            top: 0;
+            top: -6px;
             width: 0;
-            height: 100%;
+            height: calc(100% + 12px);
             z-index: 10;
             pointer-events: none;
             border-left: 3px dashed #000;
@@ -262,8 +262,8 @@
 
         .timeline-tick {
             position: absolute;
-            top: 0;
-            height: 100%;
+            top: -6px;
+            height: calc(100% + 12px);
             pointer-events: none;
             z-index: 0;
         }
@@ -2027,6 +2027,10 @@
                     // html2canvas mis-renders input/select/textarea: wrong font size and
                     // text not vertically centred. Replace each with an absolutely-positioned
                     // <div> overlay that sits exactly on top of the hidden original.
+                    // Hide "Edit Lap Times" button in the header before screenshotting
+                    const headerBtns = appEl.querySelectorAll('.header-btn');
+                    headerBtns.forEach(b => b.style.visibility = 'hidden');
+
                     const overlays = [];
                     appEl.querySelectorAll('input, select, textarea').forEach(el => {
                         const cs   = getComputedStyle(el);
@@ -2043,29 +2047,40 @@
                                          el.getAttribute('style')?.includes('text-align: center') ||
                                          el.getAttribute('style')?.includes('text-align:center');
                         const isTextarea = el.tagName === 'TEXTAREA';
+                        const isComment  = el.classList.contains('comment-ta');
+                        // Single-line textareas in run headers (wayOut/wayIn) should centre vertically
+                        const isMultiline = isTextarea && el.scrollHeight > el.clientHeight * 1.5;
+
                         // For textareas use the row height so the overlay covers the full expanded cell
                         const rowRect = el.closest('tr') ? el.closest('tr').getBoundingClientRect() : null;
                         const overlayH = isTextarea && rowRect ? rowRect.height : rect.height;
                         const overlayTop = isTextarea && rowRect ? rowRect.top - appRect.top : rect.top - appRect.top;
 
+                        // Laps number input in run header: apply same left-shift as the live page
+                        const isLapsInput = el.type === 'number' && el.dataset.action === 'changeLapCount';
+                        const extraPadLeft = isLapsInput ? 16 : 0;
+
+                        const bg = isComment ? '#ffffff' : cs.backgroundColor;
+                        const alignItems = (isTextarea && (isMultiline || isComment)) ? 'flex-start' : 'center';
+
                         const div = document.createElement('div');
                         div.style.cssText = [
                             'position:absolute',
-                            `left:${rect.left - appRect.left}px`,
+                            `left:${rect.left - appRect.left + extraPadLeft}px`,
                             `top:${overlayTop}px`,
-                            `width:${rect.width}px`,
+                            `width:${rect.width - extraPadLeft}px`,
                             `height:${overlayH}px`,
                             `font-size:${cs.fontSize}`,
                             `font-family:${cs.fontFamily}`,
                             `font-weight:${cs.fontWeight}`,
                             `color:${cs.color}`,
-                            `background:${cs.backgroundColor}`,
+                            `background:${bg}`,
                             `border:${cs.border}`,
                             `border-radius:${cs.borderRadius}`,
                             `padding:${cs.paddingTop} ${cs.paddingRight} ${cs.paddingBottom} ${cs.paddingLeft}`,
                             'box-sizing:border-box',
                             'display:flex',
-                            isTextarea ? 'align-items:flex-start' : 'align-items:center',
+                            `align-items:${alignItems}`,
                             isCenter ? 'justify-content:center' : 'justify-content:flex-start',
                             'overflow:hidden',
                             isTextarea ? 'white-space:pre-wrap' : 'white-space:nowrap',
@@ -2102,6 +2117,7 @@
                         el.style.display = '';
                         el.querySelectorAll('.add-run').forEach(b => b.style.visibility = '');
                     });
+                    headerBtns.forEach(b => b.style.visibility = '');
                     toReCollapse.forEach(c => c.classList.add('collapsed'));
 
                     // Scale down to fit page — never scale up (Math.min 1)
@@ -2148,6 +2164,10 @@
                         e.preventDefault();
                         return;
                     }
+                    // Let the browser's native context menu handle text fields so
+                    // the user can access cut/copy/paste/spell-check formatting options
+                    const tag = e.target.tagName;
+                    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
                     // Hide all menus first
                     document.getElementById('lap-context-menu').style.display = 'none';
                     document.getElementById('run-context-menu').style.display = 'none';
