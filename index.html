@@ -1023,8 +1023,8 @@
 
         function minutesToTimeString(totalSeconds) {
             const minutes = Math.floor(totalSeconds / 60);
-            const seconds = (totalSeconds % 60).toFixed(1);
-            return `${minutes}:${seconds.padStart(4, '0')}`;
+            const seconds = Math.round(totalSeconds % 60);
+            return `${minutes}:${String(seconds).padStart(2, '0')}`;
         }
 
         function timeToHHMMSS(timeStr) {
@@ -1758,7 +1758,7 @@
                         </td>
                         <td style="white-space:nowrap;">
                             <input type="text" value="${fuelVal}"
-                                   style="width:72px; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700; font-size:${run.startFuel === 'NO REFUEL' ? '10px' : '12px'};"
+                                   style="width:${run.startFuel === 'NO REFUEL' ? '62px' : '42px'}; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700; font-size:${run.startFuel === 'NO REFUEL' ? '10px' : '12px'}; padding:2px 2px;"
                                    data-action="changeStartFuel" data-session="${sessionIndex}" data-run="${runIndex}">${fuelSuffix}
                         </td>
                     </tr>
@@ -2367,7 +2367,10 @@
                         return;
                     }
 
-                    // Left click — make editable and select all text so user can type to replace
+                    // Left click on the select (lap type) — don't intercept, let it open normally
+                    if (e.target.tagName === 'SELECT') return;
+
+                    // Left click on the mode input — make editable and select all text
                     if (input) {
                         input.removeAttribute('readonly');
                         input.focus();
