@@ -1502,6 +1502,8 @@
                         <div id="ctx-delete-lap" style="padding:8px 14px; cursor:pointer; font-size:13px; color:#c00;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">✕ Delete lap</div>
                     </div>
                     <div id="session-context-menu" style="display:none; position:fixed; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2); z-index:9999; min-width:150px;">
+                        <div id="ctx-toggle-session" style="padding:8px 14px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">Collapse</div>
+                        <div style="height:1px; background:#eee; margin:0 8px;"></div>
                         <div id="ctx-delete-session" style="padding:8px 14px; cursor:pointer; font-size:13px; color:#c00;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">✕ Delete session</div>
                     </div>
                     <div id="run-context-menu" style="display:none; position:fixed; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2); z-index:9999; min-width:150px;">
@@ -1673,8 +1675,6 @@
             }
 
             renderSession(session, sessionIndex) {
-                const expandIcon = session.collapsed ? '▶' : '▼';
-
                 const totalLaps = session.runs.reduce((s, r) => s + r.laps.length, 0);
                 const totalMileage = (totalLaps * this.currentEvent.lapLength).toFixed(1);
 
@@ -1682,7 +1682,6 @@
                     <div class="session">
                         <div class="session-header" data-session="${sessionIndex}">
                             <div class="session-title">
-                                <span>${expandIcon}</span>
                                 <input type="text" value="${session.name}" placeholder="Session name"
                                        data-action="updateSessionName" data-session="${sessionIndex}"
                                        onclick="event.stopPropagation()"
@@ -1762,10 +1761,10 @@
                 const fuelSuffix = run.startFuel !== 'NO REFUEL' ? ' <span style="font-size:10px;color:#555;">kg</span>' : '';
 
                 const lapCount = run.lapsCollapsed ? 0 : run.laps.length;
-                // rowspan covers the header row + all lap rows
-                const commentRowspan = lapCount + 1;
+                // comment rowspan covers only the lap rows (not the run header itself)
+                const commentRowspan = lapCount;
 
-                // Run header row
+                // Run header row — spans full width
                 const headerRow = `
                     <tr class="run-header-row" data-session="${sessionIndex}" data-run="${runIndex}">
                         <td style="font-weight:700; font-size:13px; color:#222; white-space:nowrap;">${run.runNumber}</td>
@@ -1803,11 +1802,6 @@
                                    style="width:90px;"
                                    data-action="updateWayIn" data-session="${sessionIndex}" data-run="${runIndex}">${run.wayIn ?? 'Static Pitstop'}</textarea>
                         </td>
-                        <td rowspan="${commentRowspan}" style="vertical-align:top; padding:2px 3px; border-left:1px solid #ddd;">
-                            <textarea class="notes-ta"
-                                   style="width:90px; height:100%; min-height:20px; resize:vertical;"
-                                   data-action="updateRunComment" data-session="${sessionIndex}" data-run="${runIndex}">${run.comment || ''}</textarea>
-                        </td>
                     </tr>
                 `;
 
@@ -1823,8 +1817,15 @@
                         : lap.lapType === 'push-in' ? 'lap-row-green-soft'
                         : lap.lapType === 'prep'    ? 'lap-row-orange'
                         : greyTypes.includes(lap.lapType) ? 'lap-row-grey' : '';
-                    // Strip tenths from lap time display (e.g. "1:19.0" → "1:19")
                     const lapTimeDisplay = lap.lapTime.replace(/\.\d+$/, '');
+                    // First lap row gets the comment box spanning all lap rows (colspan 2 = WayOut+WayIn)
+                    const commentCell = lapIdx === 0 && commentRowspan > 0
+                        ? `<td rowspan="${commentRowspan}" colspan="2" style="vertical-align:top; padding:2px 3px; background:white; border-left:1px solid #ddd;">
+                               <textarea class="notes-ta"
+                                      style="width:100%; height:100%; min-height:30px; background:white;"
+                                      data-action="updateRunComment" data-session="${sessionIndex}" data-run="${runIndex}">${run.comment || ''}</textarea>
+                           </td>`
+                        : '';
 
                     return `
                         <tr class="lap-row ${rowClass}" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
@@ -1851,11 +1852,12 @@
                                        style="width:55px; text-align:center; cursor:text;"
                                        readonly>
                             </td>
-                            <td class="col-notes" colspan="3">
+                            <td class="col-notes">
                                 <textarea rows="1" class="notes-ta"
                                        data-action="changeLapNotes" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
                                        id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}">${lap.notes || ''}</textarea>
                             </td>
+                            ${commentCell}
                         </tr>
                     `;
                 }).join('');
@@ -2156,11 +2158,14 @@
                     const runHeader = e.target.closest('tr.run-header-row[data-run]');
                     if (sessionHeader && !runHeader) {
                         e.preventDefault();
+                        const sIdx = parseInt(sessionHeader.dataset.session);
+                        const isCollapsed = this.state.sessions[sIdx].collapsed;
                         const menu = document.getElementById('session-context-menu');
                         menu.style.display = 'block';
                         menu.style.left = e.clientX + 'px';
                         menu.style.top  = e.clientY + 'px';
-                        menu.dataset.session = sessionHeader.dataset.session;
+                        menu.dataset.session = sIdx;
+                        document.getElementById('ctx-toggle-session').textContent = isCollapsed ? 'Expand' : 'Collapse';
                         return;
                     }
 
@@ -2233,6 +2238,18 @@
                     };
                 }
 
+                const ctxToggleSession = document.getElementById('ctx-toggle-session');
+                if (ctxToggleSession) {
+                    ctxToggleSession.onclick = (e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById('session-context-menu');
+                        menu.style.display = 'none';
+                        const sIdx = parseInt(menu.dataset.session);
+                        this.state.sessions[sIdx].collapsed = !this.state.sessions[sIdx].collapsed;
+                        this.render();
+                    };
+                }
+
                 const ctxDeleteSession = document.getElementById('ctx-delete-session');
                 if (ctxDeleteSession) {
                     ctxDeleteSession.onclick = (e) => {
@@ -2295,16 +2312,7 @@
                     const target = e.target;
                     const action = target.dataset.action;
 
-                    if (!action) {
-                        // Check for session header clicks
-                        const sessionHeader = target.closest('.session-header');
-                        if (sessionHeader) {
-                            const sessionIndex = parseInt(sessionHeader.dataset.session);
-                            this.state.sessions[sessionIndex].collapsed = !this.state.sessions[sessionIndex].collapsed;
-                            this.render();
-                        }
-                        return;
-                    }
+                    if (!action) return;
 
                     const sessionIdx = parseInt(target.dataset.session);
                     const runIdx = parseInt(target.dataset.run);
