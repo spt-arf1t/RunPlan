@@ -1475,7 +1475,10 @@
 
             render() {
                 const app = document.getElementById('app');
+                // Preserve scroll position to avoid page jump on re-render
+                const sx = window.scrollX, sy = window.scrollY;
                 app.innerHTML = this.renderHTML();
+                window.scrollTo(sx, sy);
                 this.attachEventListeners();
                 if (this.pendingFocus) {
                     const el = document.getElementById(this.pendingFocus);
@@ -1718,11 +1721,12 @@
                                         <th style="white-space:nowrap;">Laps</th>
                                         <th style="white-space:nowrap;">Start Time</th>
                                         <th style="white-space:nowrap;">Duration</th>
+                                        <th style="white-space:nowrap;">Fuel</th>
                                         <th colspan="2" style="white-space:nowrap;">Tire / Type / Mode</th>
                                         <th class="col-notes" style="text-align:left;">Description</th>
                                         <th style="white-space:nowrap;">Way Out</th>
                                         <th style="white-space:nowrap;">Way In</th>
-                                        <th style="white-space:nowrap;">Fuel</th>
+                                        <th style="white-space:nowrap;"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1757,6 +1761,10 @@
                 const fuelVal = run.startFuel === 'NO REFUEL' ? 'No Refuel' : (run.startFuel ?? 30);
                 const fuelSuffix = run.startFuel !== 'NO REFUEL' ? ' <span style="font-size:10px;color:#555;">kg</span>' : '';
 
+                const lapCount = run.lapsCollapsed ? 0 : run.laps.length;
+                // rowspan covers the header row + all lap rows
+                const commentRowspan = lapCount + 1;
+
                 // Run header row
                 const headerRow = `
                     <tr class="run-header-row" data-session="${sessionIndex}" data-run="${runIndex}">
@@ -1767,13 +1775,18 @@
                                    data-action="changeGarageTime" data-session="${sessionIndex}" data-run="${runIndex}"
                                    id="garage-${sessionIndex}-${runIndex}">
                         </td>
-                        <td>
+                        <td style="text-align:center;">
                             <input type="number" value="${run.laps.length}" min="1" max="50"
                                    style="width:45px; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700;"
                                    data-action="changeLapCount" data-session="${sessionIndex}" data-run="${runIndex}">
                         </td>
                         <td style="white-space:nowrap; font-weight:600;">${runStartTime}</td>
                         <td style="white-space:nowrap; font-weight:600;">${duration}</td>
+                        <td style="white-space:nowrap;">
+                            <input type="text" value="${fuelVal}"
+                                   style="width:${run.startFuel === 'NO REFUEL' ? '62px' : '42px'}; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700; font-size:${run.startFuel === 'NO REFUEL' ? '10px' : '12px'}; padding:2px 2px;"
+                                   data-action="changeStartFuel" data-session="${sessionIndex}" data-run="${runIndex}">${fuelSuffix}
+                        </td>
                         <td colspan="2" style="white-space:nowrap;">${tireCell}</td>
                         <td class="col-notes">
                             <textarea rows="1" class="notes-ta"
@@ -1790,10 +1803,10 @@
                                    style="width:90px;"
                                    data-action="updateWayIn" data-session="${sessionIndex}" data-run="${runIndex}">${run.wayIn ?? 'Static Pitstop'}</textarea>
                         </td>
-                        <td style="white-space:nowrap;">
-                            <input type="text" value="${fuelVal}"
-                                   style="width:${run.startFuel === 'NO REFUEL' ? '62px' : '42px'}; text-align:center; background:#B3AFAF; border-color:#999; font-weight:700; font-size:${run.startFuel === 'NO REFUEL' ? '10px' : '12px'}; padding:2px 2px;"
-                                   data-action="changeStartFuel" data-session="${sessionIndex}" data-run="${runIndex}">${fuelSuffix}
+                        <td rowspan="${commentRowspan}" style="vertical-align:top; padding:2px 3px; border-left:1px solid #ddd;">
+                            <textarea class="notes-ta"
+                                   style="width:90px; height:100%; min-height:20px; resize:vertical;"
+                                   data-action="updateRunComment" data-session="${sessionIndex}" data-run="${runIndex}">${run.comment || ''}</textarea>
                         </td>
                     </tr>
                 `;
@@ -1810,14 +1823,17 @@
                         : lap.lapType === 'push-in' ? 'lap-row-green-soft'
                         : lap.lapType === 'prep'    ? 'lap-row-orange'
                         : greyTypes.includes(lap.lapType) ? 'lap-row-grey' : '';
+                    // Strip tenths from lap time display (e.g. "1:19.0" → "1:19")
+                    const lapTimeDisplay = lap.lapTime.replace(/\.\d+$/, '');
 
                     return `
                         <tr class="lap-row ${rowClass}" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}">
                             <td style="background:white;"></td>
                             <td style="background:white;"></td>
-                            <td style="text-align:right; padding-right:18px;">${lap.lapNumber}</td>
+                            <td style="text-align:center; padding-right:3px;">${lap.lapNumber}</td>
                             <td class="${startOverTime ? 'time-warning' : ''}" style="white-space:nowrap;">${lap.startTime}</td>
-                            <td style="white-space:nowrap;">${lap.lapTime}</td>
+                            <td style="white-space:nowrap;">${lapTimeDisplay}</td>
+                            <td style="text-align:center; white-space:nowrap;" class="${parseFloat(fuelAtEnd) <= 0 ? 'fuel-warning' : ''}">${fuelAtEnd}</td>
                             <td class="col-laptype">
                                 <select data-action="changeLapType" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
                                         id="laptype-${sessionIndex}-${runIndex}-${lapIdx}"
@@ -1840,7 +1856,6 @@
                                        data-action="changeLapNotes" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
                                        id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}">${lap.notes || ''}</textarea>
                             </td>
-                            <td class="${parseFloat(fuelAtEnd) <= 0 ? 'fuel-warning' : ''}" style="text-align:center;">${fuelAtEnd}</td>
                         </tr>
                     `;
                 }).join('');
@@ -2629,6 +2644,9 @@
                             break;
                         case 'updateWayIn':
                             this.state.sessions[sessionIdx].runs[runIdx].wayIn = target.value;
+                            break;
+                        case 'updateRunComment':
+                            this.state.sessions[sessionIdx].runs[runIdx].comment = target.value;
                             break;
                         case 'changeLapNotes':
                             this.state.sessions[sessionIdx].runs[runIdx].laps[lapIdx].notes = target.value;
