@@ -909,6 +909,38 @@
         }
 
 
+        /* Rich-text toolbar */
+        #rich-toolbar {
+            display: none;
+            position: fixed;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 10000;
+            padding: 3px 6px;
+            gap: 4px;
+            align-items: center;
+            flex-direction: row;
+        }
+        #rich-toolbar button {
+            border: 1px solid #ddd;
+            background: #f8f8f8;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 2px 7px;
+            line-height: 1.4;
+        }
+        #rich-toolbar button:hover { background: #e0e0e0; }
+        #rich-toolbar .color-swatch {
+            width: 16px; height: 16px;
+            border-radius: 2px;
+            border: 1px solid #999;
+            cursor: pointer;
+            display: inline-block;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .run-config {
@@ -1065,6 +1097,10 @@
 
         function isTimeAfter(time1, time2) {
             return time1 > time2;
+        }
+
+        function escapeAttr(str) {
+            return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         function generateId() {
@@ -1496,6 +1532,17 @@
                     ${this.state.editingLapTypes ? this.renderLapTypeEditor() : ''}
                     ${this.state.editingRecipients ? this.renderRecipientsEditor() : ''}
                     ${this.state.editingPDF ? this.renderPDFSelector() : ''}
+                    <div id="rich-toolbar">
+                        <button id="rtb-bold" title="Bold"><b>B</b></button>
+                        <button id="rtb-italic" title="Italic"><i>I</i></button>
+                        <button id="rtb-underline" title="Underline"><u>U</u></button>
+                        <span class="color-swatch" id="rtb-red"    title="Red"    style="background:#dc3545;"></span>
+                        <span class="color-swatch" id="rtb-blue"   title="Blue"   style="background:#0066cc;"></span>
+                        <span class="color-swatch" id="rtb-green"  title="Green"  style="background:#28a745;"></span>
+                        <span class="color-swatch" id="rtb-orange" title="Orange" style="background:#fd7e14;"></span>
+                        <span class="color-swatch" id="rtb-black"  title="Black"  style="background:#000000;"></span>
+                        <button id="rtb-clear" title="Clear formatting">&#x2715;</button>
+                    </div>
                     <div id="lap-context-menu" style="display:none; position:fixed; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2); z-index:9999; min-width:140px;">
                         <div id="ctx-add-lap" style="padding:8px 14px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background='white'">+ Add lap above</div>
                         <div style="height:1px; background:#eee; margin:0 8px;"></div>
@@ -1703,10 +1750,11 @@
                             <div class="session-summary" onclick="event.stopPropagation()">
                                 <span class="session-summary-item" style="flex-grow:1;">
                                     <span class="session-summary-label">Notes:</span>
-                                    <textarea rows="1" class="notes-ta"
+                                    <div contenteditable="true" class="notes-ta rich-ta"
                                            data-action="updateSessionNotes" data-session="${sessionIndex}"
                                            onclick="event.stopPropagation()"
-                                           style="color:white; flex-grow:1; width:100%;">${session.notes || ''}</textarea>
+                                           data-rich-content="${escapeAttr(session.notes)}"
+                                           style="color:white; flex-grow:1; width:100%; cursor:text;"></div>
                                 </span>
                             </div>
                         </div>
@@ -1788,9 +1836,10 @@
                         </td>
                         <td colspan="2" style="white-space:nowrap;">${tireCell}</td>
                         <td class="col-notes">
-                            <textarea rows="1" class="notes-ta"
-                                   style="width:100%;"
-                                   data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}">${run.notes || ''}</textarea>
+                            <div contenteditable="true" class="notes-ta rich-ta"
+                                   style="width:100%; cursor:text;"
+                                   data-action="updateNotes" data-session="${sessionIndex}" data-run="${runIndex}"
+                                   data-rich-content="${escapeAttr(run.notes)}"></div>
                         </td>
                         <td style="white-space:nowrap;">
                             <textarea rows="1" class="notes-ta"
@@ -1821,9 +1870,10 @@
                     // First lap row gets the comment box spanning all lap rows (colspan 2 = WayOut+WayIn)
                     const commentCell = lapIdx === 0 && commentRowspan > 0
                         ? `<td rowspan="${commentRowspan}" colspan="2" style="vertical-align:top; padding:2px 3px; background:white; border-left:1px solid #ddd;">
-                               <textarea class="notes-ta comment-ta"
-                                      style="width:100%; min-height:30px; background:white; overflow:hidden;"
-                                      data-action="updateRunComment" data-session="${sessionIndex}" data-run="${runIndex}">${run.comment || 'Comments:'}</textarea>
+                               <div contenteditable="true" class="notes-ta rich-ta comment-ta"
+                                      style="width:100%; min-height:30px; background:white; cursor:text;"
+                                      data-action="updateRunComment" data-session="${sessionIndex}" data-run="${runIndex}"
+                                      data-rich-content="${escapeAttr(run.comment || 'Comments:')}"></div>
                            </td>`
                         : '';
 
@@ -1853,9 +1903,11 @@
                                        readonly>
                             </td>
                             <td class="col-notes">
-                                <textarea rows="1" class="notes-ta"
+                                <div contenteditable="true" class="notes-ta rich-ta"
                                        data-action="changeLapNotes" data-session="${sessionIndex}" data-run="${runIndex}" data-lap="${lapIdx}"
-                                       id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}">${lap.notes || ''}</textarea>
+                                       id="lapnotes-${sessionIndex}-${runIndex}-${lapIdx}"
+                                       data-rich-content="${escapeAttr(lap.notes)}"
+                                       style="cursor:text;"></div>
                             </td>
                             ${commentCell}
                         </tr>
@@ -2164,8 +2216,23 @@
                         e.preventDefault();
                         return;
                     }
-                    // Let the browser's native context menu handle text fields so
-                    // the user can access cut/copy/paste/spell-check formatting options
+                    // If the target is a rich-text contenteditable field, show the rich toolbar
+                    const richTarget = e.target.closest('.rich-ta');
+                    if (richTarget) {
+                        e.preventDefault();
+                        document.getElementById('rich-toolbar').style.display = 'none';
+                        // Save current selection before focus shifts away
+                        this._richTarget = richTarget;
+                        this._richRange = window.getSelection().rangeCount > 0
+                            ? window.getSelection().getRangeAt(0).cloneRange()
+                            : null;
+                        const toolbar = document.getElementById('rich-toolbar');
+                        toolbar.style.display = 'flex';
+                        toolbar.style.left = e.clientX + 'px';
+                        toolbar.style.top  = e.clientY + 'px';
+                        return;
+                    }
+                    // Let the browser's native context menu handle plain INPUT fields
                     const tag = e.target.tagName;
                     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
                     // Hide all menus first
@@ -2222,12 +2289,68 @@
                 };
 
                 // Dismiss all menus on any click
-                document.onclick = () => {
+                document.onclick = (e) => {
+                    // Don't dismiss toolbar when clicking inside it
+                    const toolbar = document.getElementById('rich-toolbar');
+                    if (toolbar && !toolbar.contains(e.target)) {
+                        toolbar.style.display = 'none';
+                    }
                     ['lap-context-menu','run-context-menu','session-context-menu'].forEach(id => {
                         const m = document.getElementById(id);
                         if (m) m.style.display = 'none';
                     });
                 };
+
+                // Dismiss toolbar on Escape
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        const toolbar = document.getElementById('rich-toolbar');
+                        if (toolbar) toolbar.style.display = 'none';
+                    }
+                });
+
+                // Rich toolbar button handlers
+                const richExec = (cmd, val) => {
+                    if (this._richRange) {
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(this._richRange);
+                    }
+                    document.execCommand(cmd, false, val || null);
+                    // Update stored state
+                    if (this._richTarget) {
+                        const t = this._richTarget;
+                        const action = t.dataset.action;
+                        const sIdx = parseInt(t.dataset.session);
+                        const rIdx = parseInt(t.dataset.run);
+                        const lIdx = parseInt(t.dataset.lap);
+                        switch (action) {
+                            case 'updateSessionNotes':
+                                this.state.sessions[sIdx].notes = t.innerHTML; break;
+                            case 'updateNotes':
+                                this.state.sessions[sIdx].runs[rIdx].notes = t.innerHTML; break;
+                            case 'changeLapNotes':
+                                this.state.sessions[sIdx].runs[rIdx].laps[lIdx].notes = t.innerHTML; break;
+                            case 'updateRunComment':
+                                this.state.sessions[sIdx].runs[rIdx].comment = t.innerHTML; break;
+                        }
+                    }
+                    document.getElementById('rich-toolbar').style.display = 'none';
+                };
+
+                const rtbBold = document.getElementById('rtb-bold');
+                if (rtbBold) rtbBold.addEventListener('mousedown', (e) => { e.preventDefault(); richExec('bold'); });
+                const rtbItalic = document.getElementById('rtb-italic');
+                if (rtbItalic) rtbItalic.addEventListener('mousedown', (e) => { e.preventDefault(); richExec('italic'); });
+                const rtbUnderline = document.getElementById('rtb-underline');
+                if (rtbUnderline) rtbUnderline.addEventListener('mousedown', (e) => { e.preventDefault(); richExec('underline'); });
+                const rtbClear = document.getElementById('rtb-clear');
+                if (rtbClear) rtbClear.addEventListener('mousedown', (e) => { e.preventDefault(); richExec('removeFormat'); });
+
+                [['rtb-red','#dc3545'],['rtb-blue','#0066cc'],['rtb-green','#28a745'],['rtb-orange','#fd7e14'],['rtb-black','#000000']].forEach(([id, color]) => {
+                    const el = document.getElementById(id);
+                    if (el) el.addEventListener('mousedown', (e) => { e.preventDefault(); richExec('foreColor', color); });
+                });
 
                 // Context menu item actions
                 const ctxAddLap = document.getElementById('ctx-add-lap');
@@ -2513,7 +2636,7 @@
                     this.render();
                 });
 
-                // Auto-expand textareas without causing layout jump.
+                // Auto-expand textareas/contenteditable divs without causing layout jump.
                 // We never set height:auto (which collapses to 0 and causes a reflow flash).
                 // Instead just push height up when scrollHeight exceeds current height.
                 const autoExpand = (ta) => {
@@ -2523,12 +2646,40 @@
                 app.addEventListener('input', (e) => {
                     if (e.target.tagName === 'TEXTAREA') autoExpand(e.target);
                 });
+
+                // Initialize rich-ta content from data-rich-content attribute
+                document.querySelectorAll('.rich-ta[data-rich-content]').forEach(el => {
+                    el.innerHTML = el.dataset.richContent || '';
+                });
+
+                // Handle input events on rich-ta contenteditable divs
+                app.addEventListener('input', (e) => {
+                    const target = e.target;
+                    if (!target.classList.contains('rich-ta')) return;
+                    const action = target.dataset.action;
+                    const sIdx = parseInt(target.dataset.session);
+                    const rIdx = parseInt(target.dataset.run);
+                    const lIdx = parseInt(target.dataset.lap);
+                    switch (action) {
+                        case 'updateSessionNotes':
+                            this.state.sessions[sIdx].notes = target.innerHTML; break;
+                        case 'updateNotes':
+                            this.state.sessions[sIdx].runs[rIdx].notes = target.innerHTML; break;
+                        case 'changeLapNotes':
+                            this.state.sessions[sIdx].runs[rIdx].laps[lIdx].notes = target.innerHTML; break;
+                        case 'updateRunComment':
+                            this.state.sessions[sIdx].runs[rIdx].comment = target.innerHTML; break;
+                    }
+                    autoExpand(target);
+                });
                 // After render: expand content textareas, then size comment boxes to match row heights
                 setTimeout(() => {
-                    // Expand notes textareas to fit their content
+                    // Expand notes-ta divs (rich-ta, non-comment) to fit their content
+                    document.querySelectorAll('.rich-ta:not(.comment-ta)').forEach(autoExpand);
+                    // Also expand any remaining plain textareas
                     document.querySelectorAll('textarea.notes-ta:not(.comment-ta)').forEach(autoExpand);
-                    // Size each comment textarea to fill its rowspan cell
-                    document.querySelectorAll('textarea.comment-ta').forEach(ta => {
+                    // Size each comment div to fill its rowspan cell
+                    document.querySelectorAll('.comment-ta').forEach(ta => {
                         const td = ta.closest('td');
                         if (!td) return;
                         const trList = [];
@@ -2650,7 +2801,7 @@
                             this.render();
                             break;
                         case 'updateSessionNotes':
-                            this.state.sessions[sessionIdx].notes = target.value;
+                            // Handled by rich-ta input listener
                             break;
                         case 'changeTireSet':
                             this.changeTireSet(sessionIdx, runIdx, target.value);
@@ -2683,7 +2834,7 @@
                             break;
                         }
                         case 'updateNotes':
-                            this.state.sessions[sessionIdx].runs[runIdx].notes = target.value;
+                            // Handled by rich-ta input listener
                             break;
                         case 'updateWayOut':
                             this.state.sessions[sessionIdx].runs[runIdx].wayOut = target.value;
@@ -2692,10 +2843,10 @@
                             this.state.sessions[sessionIdx].runs[runIdx].wayIn = target.value;
                             break;
                         case 'updateRunComment':
-                            this.state.sessions[sessionIdx].runs[runIdx].comment = target.value;
+                            // Handled by rich-ta input listener
                             break;
                         case 'changeLapNotes':
-                            this.state.sessions[sessionIdx].runs[runIdx].laps[lapIdx].notes = target.value;
+                            // Handled by rich-ta input listener
                             break;
                     }
                 };
